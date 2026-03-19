@@ -97,6 +97,20 @@ _CSS_ANIMATIONS = """
   50% { transform: translate(-0.5px, -0.6px); opacity: 1; }
   75% { transform: translate(0.4px, -1px); opacity: 0.75; }
 }
+
+/* ── Bar hover interactions ─────────────────────────────────────────── */
+.fp-bar { cursor: pointer; }
+.fp-bar-glow { opacity: 0; transition: opacity 0.35s ease-out; }
+.fp-bar:hover .fp-bar-glow { opacity: 1; transition: opacity 0.15s ease-in; }
+
+/* Glow drifts + sparkle floats only play on hover */
+.fp-bar .fp-drift { animation: none !important; }
+.fp-bar:hover .fp-drift1 { animation: fp-glowDrift1 4s ease-in-out infinite !important; }
+.fp-bar:hover .fp-drift2 { animation: fp-glowDrift2 3.5s ease-in-out 0.3s infinite !important; }
+.fp-bar:hover .fp-drift3 { animation: fp-glowDrift3 3.8s ease-in-out 0.2s infinite !important; }
+.fp-bar:hover .fp-drift1b { animation: fp-glowDrift1 4.2s ease-in-out 0.5s infinite !important; }
+.fp-bar .fp-sparkle { animation: none !important; }
+.fp-bar:hover .fp-sparkle { animation: var(--fp-sparkle-anim) !important; }
 """
 
 
@@ -233,76 +247,80 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str) -> str:
                 if animate:
                     grow_style = f'transform-origin:{bar.x + bar.width/2:.1f}px {pa.y + pa.h:.1f}px;animation:fp-barGrow 0.81s cubic-bezier(0.22,1,0.36,1) {delay:.2f}s both;'
 
-                # Base rect
-                lines.append(f'<rect x="{bar.x:.1f}" y="{bar.y:.1f}" width="{bar.width:.1f}" height="{bar.height:.1f}" '
+                # Outer hover group
+                lines.append(f'<g class="fp-bar">')
+
+                # Base rect (dark fill, always visible)
+                lines.append(f'  <rect x="{bar.x:.1f}" y="{bar.y:.1f}" width="{bar.width:.1f}" height="{bar.height:.1f}" '
                              f'fill="{theme.bar_default_fill}" style="{grow_style}"/>')
 
                 # Color + glow layers (clipped to bar shape)
                 clip_id = f"bc-{uid}-{si}-{bar.index}"
-                lines.append(f'<clipPath id="{clip_id}"><rect x="{bar.x:.1f}" y="{bar.y:.1f}" width="{bar.width:.1f}" height="{bar.height:.1f}" style="{grow_style}"/></clipPath>')
+                lines.append(f'  <clipPath id="{clip_id}"><rect x="{bar.x:.1f}" y="{bar.y:.1f}" width="{bar.width:.1f}" height="{bar.height:.1f}" style="{grow_style}"/></clipPath>')
 
-                # Sweep animation: briefly show glow layers per bar
-                sweep_opacity = "1"
+                # Glow group — hidden by default, shown on hover via CSS
+                # Sweep animation plays once on load then returns to 0
                 sweep_style = ""
                 if animate:
                     sweep_delay = bar_sweep_start + bar.index * bar_sweep_step
-                    sweep_style = f'animation:fp-barSweep 0.4s ease {sweep_delay:.2f}s 1;'
-                    sweep_opacity = "0"
+                    sweep_style = f' style="animation:fp-barSweep 0.4s ease {sweep_delay:.2f}s 1"'
 
-                lines.append(f'<g clip-path="url(#{clip_id})" opacity="{sweep_opacity}" style="{sweep_style}">')
+                lines.append(f'  <g class="fp-bar-glow" clip-path="url(#{clip_id})"{sweep_style}>')
 
                 # Color fill
-                lines.append(f'  <rect x="{bar.x:.1f}" y="{bar.y:.1f}" width="{bar.width:.1f}" height="{bar.height:.1f}" fill="{st.fill}" style="{grow_style}"/>')
+                lines.append(f'    <rect x="{bar.x:.1f}" y="{bar.y:.1f}" width="{bar.width:.1f}" height="{bar.height:.1f}" fill="{st.fill}" style="{grow_style}"/>')
 
-                # Glow layers with drift animations
+                # Glow layers with drift classes (activated on hover via CSS)
                 sc = lambda hv: (hv / 134) * bar.height
                 bx, bw = bar.x, bar.width
                 ay, ah = bar.y, bar.height
 
                 # Side glow
-                drift1 = 'animation:fp-glowDrift1 4s ease-in-out infinite;' if animate else ''
-                lines.append(f'  <g filter="url(#barSideGlow-{uid}-{si})" style="{drift1}">')
-                lines.append(f'    <path d="M{bx} {ay+ah+sc(11)} V{ay+ah-sc(0.5)} C{bx} {ay+ah-sc(0.5)} {bx+bw*0.85} {ay+ah-sc(15)} {bx+bw*0.85} {ay+ah-sc(26)} V{ay+sc(21)} C{bx+bw*0.85} {ay+sc(14)} {bx+bw*0.275} {ay+sc(7.69)} {bx} {ay+sc(7.5)} V{ay-sc(4)} C{bx} {ay-sc(4)} {bx+bw*1.225} {ay+sc(4.5)} {bx+bw*1.225} {ay+sc(21)} V{ay+ah-sc(40.5)} C{bx+bw*1.225} {ay+ah-sc(8)} {bx+bw*0.85} {ay+ah-sc(9.5)} {bx} {ay+ah+sc(11)} Z" fill="{st.side_glow}"/>')
-                lines.append("  </g>")
+                lines.append(f'    <g class="fp-drift fp-drift1" filter="url(#barSideGlow-{uid}-{si})">')
+                lines.append(f'      <path d="M{bx} {ay+ah+sc(11)} V{ay+ah-sc(0.5)} C{bx} {ay+ah-sc(0.5)} {bx+bw*0.85} {ay+ah-sc(15)} {bx+bw*0.85} {ay+ah-sc(26)} V{ay+sc(21)} C{bx+bw*0.85} {ay+sc(14)} {bx+bw*0.275} {ay+sc(7.69)} {bx} {ay+sc(7.5)} V{ay-sc(4)} C{bx} {ay-sc(4)} {bx+bw*1.225} {ay+sc(4.5)} {bx+bw*1.225} {ay+sc(21)} V{ay+ah-sc(40.5)} C{bx+bw*1.225} {ay+ah-sc(8)} {bx+bw*0.85} {ay+ah-sc(9.5)} {bx} {ay+ah+sc(11)} Z" fill="{st.side_glow}"/>')
+                lines.append("    </g>")
 
                 # Top highlight
-                drift2 = 'animation:fp-glowDrift2 3.5s ease-in-out 0.3s infinite;' if animate else ''
-                lines.append(f'  <g filter="url(#barTopHL-{uid}-{si})" style="{drift2}">')
-                lines.append(f'    <rect x="{bx+bw*0.05:.1f}" y="{ay+sc(1):.1f}" width="{bw*0.9:.1f}" height="{sc(8):.1f}" rx="2" fill="{st.top_glow}"/>')
-                lines.append("  </g>")
+                lines.append(f'    <g class="fp-drift fp-drift2" filter="url(#barTopHL-{uid}-{si})">')
+                lines.append(f'      <rect x="{bx+bw*0.05:.1f}" y="{ay+sc(1):.1f}" width="{bw*0.9:.1f}" height="{sc(8):.1f}" rx="2" fill="{st.top_glow}"/>')
+                lines.append("    </g>")
 
                 # Bottom glow
-                drift3 = 'animation:fp-glowDrift3 3.8s ease-in-out 0.2s infinite;' if animate else ''
-                lines.append(f'  <g filter="url(#barBotGlow-{uid}-{si})" style="{drift3}">')
-                lines.append(f'    <path d="M{bx+bw*0.05} {ay+ah-sc(8.2)} C{bx+bw*0.05} {ay+ah-sc(9.2)} {bx+bw*0.05} {ay+ah-sc(4)} {bx+bw*0.17} {ay+ah-sc(1.5)} C{bx+bw*0.28} {ay+ah+sc(0.8)} {bx+bw*0.72} {ay+ah+sc(0.8)} {bx+bw*0.83} {ay+ah-sc(1.5)} C{bx+bw*0.95} {ay+ah-sc(4)} {bx+bw*0.95} {ay+ah-sc(9.2)} {bx+bw*0.95} {ay+ah-sc(8.2)} V{ay+ah} H{bx+bw*0.05} V{ay+ah-sc(8.2)}Z" fill="{st.bottom_glow}"/>')
-                lines.append("  </g>")
+                lines.append(f'    <g class="fp-drift fp-drift3" filter="url(#barBotGlow-{uid}-{si})">')
+                lines.append(f'      <path d="M{bx+bw*0.05} {ay+ah-sc(8.2)} C{bx+bw*0.05} {ay+ah-sc(9.2)} {bx+bw*0.05} {ay+ah-sc(4)} {bx+bw*0.17} {ay+ah-sc(1.5)} C{bx+bw*0.28} {ay+ah+sc(0.8)} {bx+bw*0.72} {ay+ah+sc(0.8)} {bx+bw*0.83} {ay+ah-sc(1.5)} C{bx+bw*0.95} {ay+ah-sc(4)} {bx+bw*0.95} {ay+ah-sc(9.2)} {bx+bw*0.95} {ay+ah-sc(8.2)} V{ay+ah} H{bx+bw*0.05} V{ay+ah-sc(8.2)}Z" fill="{st.bottom_glow}"/>')
+                lines.append("    </g>")
 
                 # Left edge glow
-                drift1b = 'animation:fp-glowDrift1 4.2s ease-in-out 0.5s infinite;' if animate else ''
-                lines.append(f'  <g filter="url(#barLeftEdge-{uid}-{si})" style="{drift1b}">')
-                lines.append(f'    <path d="M{bx-bw*0.01} {ay+sc(4)} C{bx+bw*0.045} {ay+sc(4)} {bx+bw*0.045} {ay+sc(4)} {bx+bw*0.045} {ay+sc(8)} V{ay+ah-sc(8)} C{bx+bw*0.045} {ay+ah-sc(4)} {bx-bw*0.01} {ay+ah-sc(2)} {bx-bw*0.01} {ay+ah} V{ay+sc(4)}Z" fill="{st.left_edge}"/>')
-                lines.append("  </g>")
+                lines.append(f'    <g class="fp-drift fp-drift1b" filter="url(#barLeftEdge-{uid}-{si})">')
+                lines.append(f'      <path d="M{bx-bw*0.01} {ay+sc(4)} C{bx+bw*0.045} {ay+sc(4)} {bx+bw*0.045} {ay+sc(4)} {bx+bw*0.045} {ay+sc(8)} V{ay+ah-sc(8)} C{bx+bw*0.045} {ay+ah-sc(4)} {bx-bw*0.01} {ay+ah-sc(2)} {bx-bw*0.01} {ay+ah} V{ay+sc(4)}Z" fill="{st.left_edge}"/>')
+                lines.append("    </g>")
 
-                # Sparkle dots
+                # Sparkle dots (float animation only on hover via CSS)
                 for d_idx, (dcx, dcy, dr) in enumerate(SPARKLE_DOTS):
-                    float_anim = ["fp-sparkleFloat1", "fp-sparkleFloat2", "fp-sparkleFloat3"][d_idx % 3]
+                    float_name = ["fp-sparkleFloat1", "fp-sparkleFloat2", "fp-sparkleFloat3"][d_idx % 3]
                     dur = 2.5 + (d_idx % 5) * 0.5
                     sp_delay = (d_idx * 0.2) % 1.5
-                    sp_style = f'animation:{float_anim} {dur}s ease-in-out {sp_delay:.1f}s infinite;' if animate else ''
-                    lines.append(f'  <circle cx="{bx + dcx * bw:.1f}" cy="{ay + dcy * ah:.1f}" r="{dr}" '
-                                 f'fill="{st.sparkle}" style="{sp_style}"/>')
+                    sp_var = f'--fp-sparkle-anim:{float_name} {dur}s ease-in-out {sp_delay:.1f}s infinite;'
+                    lines.append(f'    <circle class="fp-sparkle" cx="{bx + dcx * bw:.1f}" cy="{ay + dcy * ah:.1f}" r="{dr}" '
+                                 f'fill="{st.sparkle}" style="{sp_var}"/>')
 
                 # Bottom white edge
-                lines.append(f'  <g filter="url(#barBotWhite-{uid}-{si})">')
-                lines.append(f'    <path d="M{bx} {ay+ah-sc(3.5)} L{bx+bw*0.5} {ay+ah-sc(1.5)} L{bx+bw} {ay+ah-sc(3.5)} V{ay+ah} H{bx} V{ay+ah-sc(3.5)}Z" fill="white" fill-opacity="0.8"/>')
-                lines.append("  </g>")
+                lines.append(f'    <g filter="url(#barBotWhite-{uid}-{si})">')
+                lines.append(f'      <path d="M{bx} {ay+ah-sc(3.5)} L{bx+bw*0.5} {ay+ah-sc(1.5)} L{bx+bw} {ay+ah-sc(3.5)} V{ay+ah} H{bx} V{ay+ah-sc(3.5)}Z" fill="white" fill-opacity="0.8"/>')
+                lines.append("    </g>")
 
                 # Top white edge
-                lines.append(f'  <g filter="url(#barTopWhite-{uid}-{si})">')
-                lines.append(f'    <path d="M{bx} {ay+sc(3.5)} L{bx+bw*0.5} {ay+sc(1.5)} L{bx+bw} {ay+sc(3.5)} V{ay} H{bx} V{ay+sc(3.5)}Z" fill="white" fill-opacity="0.8"/>')
-                lines.append("  </g>")
+                lines.append(f'    <g filter="url(#barTopWhite-{uid}-{si})">')
+                lines.append(f'      <path d="M{bx} {ay+sc(3.5)} L{bx+bw*0.5} {ay+sc(1.5)} L{bx+bw} {ay+sc(3.5)} V{ay} H{bx} V{ay+sc(3.5)}Z" fill="white" fill-opacity="0.8"/>')
+                lines.append("    </g>")
 
-                lines.append("</g>")
+                lines.append("  </g>")  # close fp-bar-glow
+
+                # Invisible hit area (slightly wider for easier hover targeting)
+                lines.append(f'  <rect x="{bar.x - 2:.1f}" y="{bar.y - 2:.1f}" width="{bar.width + 4:.1f}" height="{bar.height + 4:.1f}" '
+                             f'fill="transparent" style="{grow_style}"/>')
+
+                lines.append("</g>")  # close fp-bar
 
         elif isinstance(el, ScatterPlotElement):
             for i, (px, py, sz) in enumerate(el.points):
