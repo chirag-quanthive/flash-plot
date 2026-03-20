@@ -526,9 +526,45 @@ class Axes:
 
             elif isinstance(cmd, _FillCmd):
                 if isinstance(cmd.y2_data, list):
-                    path, pts = build_fill_between_path(cmd.y1_data, cmd.y2_data, pa, y_lo, y_hi, self._yscale)
+                    # Two-curve fill_between
+                    n = len(cmd.y1_data)
+                    if cmd.x_data:
+                        top = [
+                            Point(
+                                pa.x + scale_value(self._xscale, cmd.x_data[i], x_lo, x_hi, 0, pa.w),
+                                pa.y + pa.h - scale_value(self._yscale, v, y_lo, y_hi, 0, pa.h),
+                            )
+                            for i, v in enumerate(cmd.y1_data)
+                        ]
+                        bot = [
+                            Point(
+                                pa.x + scale_value(self._xscale, cmd.x_data[i], x_lo, x_hi, 0, pa.w),
+                                pa.y + pa.h - scale_value(self._yscale, v, y_lo, y_hi, 0, pa.h),
+                            )
+                            for i, v in enumerate(cmd.y2_data)
+                        ]
+                        fwd = " ".join(f"{'M' if i == 0 else 'L'}{p.x:.1f},{p.y:.1f}" for i, p in enumerate(top))
+                        bwd = " ".join(f"L{p.x:.1f},{p.y:.1f}" for p in reversed(bot))
+                        path = f"{fwd} {bwd} Z"
+                        pts = top
+                    else:
+                        path, pts = build_fill_between_path(cmd.y1_data, cmd.y2_data, pa, y_lo, y_hi, self._yscale)
                 else:
-                    path, pts = build_area_path(cmd.y1_data, pa, y_lo, y_hi, cmd.y2_data, self._yscale)
+                    # Area fill down to baseline
+                    baseline = cmd.y2_data
+                    base_y = pa.y + pa.h  # always close at bottom of plot area
+                    if cmd.x_data:
+                        pts = [
+                            Point(
+                                pa.x + scale_value(self._xscale, cmd.x_data[i], x_lo, x_hi, 0, pa.w),
+                                pa.y + pa.h - scale_value(self._yscale, v, y_lo, y_hi, 0, pa.h),
+                            )
+                            for i, v in enumerate(cmd.y1_data)
+                        ]
+                    else:
+                        pts = [map_point(i, v, len(cmd.y1_data), pa, y_lo, y_hi, self._yscale) for i, v in enumerate(cmd.y1_data)]
+                    line = " ".join(f"{'M' if i == 0 else 'L'}{p.x:.1f},{p.y:.1f}" for i, p in enumerate(pts))
+                    path = f"{line} L{pts[-1].x:.1f},{base_y:.1f} L{pts[0].x:.1f},{base_y:.1f} Z"
                 color = cmd.opts.get("color", self._theme.default_colors[0])
                 el = AreaPlotElement(points=pts, path=path, color=color, alpha=cmd.opts.get("alpha", 0.15), label=cmd.opts.get("label"), zorder=cmd.opts.get("zorder", z))
                 elements.append(el)
