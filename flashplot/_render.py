@@ -390,6 +390,8 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
     # ── Plot elements ───────────────────────────────────────────────────
     line_idx = 0
     area_idx = 0
+    # Collect bar tooltip data to render in a top-layer overlay (z-index fix)
+    _bar_tooltips: list = []
     for el in sp.elements:
         if isinstance(el, AreaPlotElement):
             anim_style = ""
@@ -479,22 +481,15 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
 
                 lines.append("  </g>")  # close fp-bar-glow
 
-                # Hover tooltip for this bar
+                # Hit area for glow hover (no tooltip here — tooltips in overlay)
+                lines.append(f'  <rect x="{bar.x - 2:.1f}" y="{bar.y - 2:.1f}" width="{bar.width + 4:.1f}" height="{bar.height + 4:.1f}" '
+                             f'fill="transparent" opacity="0"/>')
+                lines.append("</g>")  # close fp-bar
+
+                # Collect tooltip data for top-layer rendering
                 if hover:
                     x_label = el.x_labels[bar.index] if bar.index < len(el.x_labels) else str(bar.index)
-                    lines.append(_build_bar_tooltip(bar, el.label, x_label, bar.value, el.color, uid, pa, w))
-
-                # Hit area (no grow animation — always full size for reliable hover)
-                if hover:
-                    x_label_title = el.x_labels[bar.index] if bar.index < len(el.x_labels) else str(bar.index)
-                    title_text = f"{x_label_title}: {_fmt_val(bar.value)}"
-                    lines.append(f'  <rect x="{bar.x - 2:.1f}" y="{bar.y - 2:.1f}" width="{bar.width + 4:.1f}" height="{bar.height + 4:.1f}" '
-                                 f'fill="transparent" opacity="0">'
-                                 f'<title>{_esc(title_text)}</title></rect>')
-                else:
-                    lines.append(f'  <rect x="{bar.x - 2:.1f}" y="{bar.y - 2:.1f}" width="{bar.width + 4:.1f}" height="{bar.height + 4:.1f}" '
-                                 f'fill="transparent" opacity="0"/>')
-                lines.append("</g>")  # close fp-bar
+                    _bar_tooltips.append((bar, el.label, x_label, bar.value, el.color))
 
         elif isinstance(el, ScatterPlotElement):
             for i, (px, py, sz) in enumerate(el.points):
@@ -550,10 +545,25 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
             g += "</g>"
             lines.append(g)
 
-    # ── Hover overlay (rendered last so it's on top) ───────────────────
+    # ── Hover overlay (rendered last so it's on top of all elements) ───
     if hover:
         lines.append(_build_line_hover_overlay(sp, uid))
         lines.append(_build_scatter_hover_overlay(sp, uid))
+
+        # Bar tooltips — rendered here (top layer) to avoid z-index clipping
+        for bar, label, x_label, value, color in _bar_tooltips:
+            title_text = f"{x_label}: {_fmt_val(value)}"
+            lines.append(f'<g class="fp-tip">')
+            lines.append(f'  <rect x="{bar.x - 2:.1f}" y="{bar.y - 2:.1f}" width="{bar.width + 4:.1f}" '
+                         f'height="{bar.height + 4:.1f}" fill="transparent">'
+                         f'<title>{_esc(title_text)}</title></rect>')
+            lines.append(f'  <g class="fp-tip-content">')
+            lines.append(_build_tooltip_box(
+                x_label, [(color, label or "Value", _fmt_val(value))],
+                bar.x + bar.width / 2, bar.y - 8, 110, w, pa.y,
+            ))
+            lines.append("  </g>")
+            lines.append("</g>")
 
     lines.append("</svg>")
     return "\n".join(lines)
