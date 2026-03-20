@@ -331,11 +331,16 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
 
     # Defs
     lines.append("<defs>")
-    grad_id = f"areaGrad-{uid}"
-    lines.append(f'<linearGradient id="{grad_id}" x1="0" y1="0" x2="0" y2="1">')
-    lines.append(f'  <stop offset="0%" stop-color="#d4d4d4" stop-opacity="0.15"/>')
-    lines.append(f'  <stop offset="100%" stop-color="#1F1F1F" stop-opacity="0.05"/>')
-    lines.append("</linearGradient>")
+
+    # Per-area gradients using each area's own color (30% → 10% opacity)
+    area_grad_ids = {}
+    for a_idx, el in enumerate(e for e in sp.elements if isinstance(e, AreaPlotElement)):
+        gid = f"areaGrad-{uid}-{a_idx}"
+        area_grad_ids[id(el)] = gid
+        lines.append(f'<linearGradient id="{gid}" x1="0" y1="0" x2="0" y2="1">')
+        lines.append(f'  <stop offset="0%" stop-color="{el.color}" stop-opacity="0.3"/>')
+        lines.append(f'  <stop offset="100%" stop-color="{el.color}" stop-opacity="0.1"/>')
+        lines.append("</linearGradient>")
 
     bar_series = set()
     for el in sp.elements:
@@ -397,7 +402,8 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
             anim_style = ""
             if animate:
                 anim_style = f'animation:fp-areaFade 1.08s ease {T_DATA + area_idx*0.135:.2f}s both;'
-            lines.append(f'<path d="{el.path}" fill="url(#{grad_id})" opacity="{el.alpha}" style="{anim_style}"/>')
+            gid = area_grad_ids.get(id(el), f"areaGrad-{uid}-0")
+            lines.append(f'<path d="{el.path}" fill="url(#{gid})" opacity="{el.alpha}" style="{anim_style}"/>')
             area_idx += 1
 
         elif isinstance(el, LinePlotElement):
