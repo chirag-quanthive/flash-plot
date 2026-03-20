@@ -114,6 +114,7 @@ _CSS_ANIMATIONS = """
 .fp-tip { pointer-events: all; }
 .fp-tip-content { opacity: 0; pointer-events: none; transition: opacity 0.12s ease; }
 .fp-tip:hover .fp-tip-content { opacity: 1; }
+.fp-bar:hover .fp-tip-content { opacity: 1; }
 """
 
 
@@ -320,6 +321,14 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
     lines.append(f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w:.1f} {h:.1f}" '
                  f'style="width:100%;height:auto;display:block;font-family:\'Inter\',sans-serif;">')
 
+    # Inline styles for hover (ensures they work inside SVG in all contexts)
+    if hover:
+        lines.append("<style>")
+        lines.append(".fp-tip-content{opacity:0;pointer-events:none;transition:opacity .12s ease}")
+        lines.append(".fp-tip:hover .fp-tip-content{opacity:1}")
+        lines.append(".fp-bar:hover .fp-tip-content{opacity:1}")
+        lines.append("</style>")
+
     # Defs
     lines.append("<defs>")
     grad_id = f"areaGrad-{uid}"
@@ -475,8 +484,16 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                     x_label = el.x_labels[bar.index] if bar.index < len(el.x_labels) else str(bar.index)
                     lines.append(_build_bar_tooltip(bar, el.label, x_label, bar.value, el.color, uid, pa, w))
 
-                lines.append(f'  <rect x="{bar.x - 2:.1f}" y="{bar.y - 2:.1f}" width="{bar.width + 4:.1f}" height="{bar.height + 4:.1f}" '
-                             f'fill="transparent" style="{grow_style}"/>')
+                # Hit area (no grow animation — always full size for reliable hover)
+                if hover:
+                    x_label_title = el.x_labels[bar.index] if bar.index < len(el.x_labels) else str(bar.index)
+                    title_text = f"{x_label_title}: {_fmt_val(bar.value)}"
+                    lines.append(f'  <rect x="{bar.x - 2:.1f}" y="{bar.y - 2:.1f}" width="{bar.width + 4:.1f}" height="{bar.height + 4:.1f}" '
+                                 f'fill="transparent" opacity="0">'
+                                 f'<title>{_esc(title_text)}</title></rect>')
+                else:
+                    lines.append(f'  <rect x="{bar.x - 2:.1f}" y="{bar.y - 2:.1f}" width="{bar.width + 4:.1f}" height="{bar.height + 4:.1f}" '
+                                 f'fill="transparent" opacity="0"/>')
                 lines.append("</g>")  # close fp-bar
 
         elif isinstance(el, ScatterPlotElement):
