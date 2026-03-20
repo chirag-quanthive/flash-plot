@@ -102,8 +102,6 @@ _CSS_ANIMATIONS = """
 .fp-bar { cursor: pointer; }
 .fp-bar-glow { opacity: 0; transition: opacity 0.35s ease-out; }
 .fp-bar:hover .fp-bar-glow { opacity: 1; transition: opacity 0.15s ease-in; }
-
-/* Glow drifts + sparkle floats only play on hover */
 .fp-bar .fp-drift { animation: none !important; }
 .fp-bar:hover .fp-drift1 { animation: fp-glowDrift1 4s ease-in-out infinite !important; }
 .fp-bar:hover .fp-drift2 { animation: fp-glowDrift2 3.5s ease-in-out 0.3s infinite !important; }
@@ -111,6 +109,11 @@ _CSS_ANIMATIONS = """
 .fp-bar:hover .fp-drift1b { animation: fp-glowDrift1 4.2s ease-in-out 0.5s infinite !important; }
 .fp-bar .fp-sparkle { animation: none !important; }
 .fp-bar:hover .fp-sparkle { animation: var(--fp-sparkle-anim) !important; }
+
+/* ── Hover tooltips ─────────────────────────────────────────────────── */
+.fp-tip { pointer-events: all; }
+.fp-tip-content { opacity: 0; pointer-events: none; transition: opacity 0.12s ease; }
+.fp-tip:hover .fp-tip-content { opacity: 1; }
 """
 
 
@@ -118,33 +121,201 @@ def _esc(s: str) -> str:
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
 
 
+def _fmt_val(v: float) -> str:
+    """Format a value for tooltip display."""
+    if abs(v) >= 1e6:
+        return f"{v:.2e}"
+    if abs(v) >= 100:
+        return f"{v:,.0f}"
+    if abs(v) >= 1:
+        return f"{v:,.2f}"
+    if v == 0:
+        return "0"
+    return f"{v:.4g}"
+
+
+# ── Tooltip Builder ────────────────────────────────────────────────────
+
+def _build_tooltip_box(
+    header: str, entries: list, tx: float, ty: float,
+    w: float, bounds_w: float, pa_y: float,
+) -> str:
+    """Build a tooltip SVG group.
+    entries: list of (color, label, value_str)
+    """
+    row_h = 18
+    header_h = 22
+    pad = 8
+    total_h = pad + header_h + len(entries) * row_h + pad
+
+    # Flip left if tooltip would overflow right
+    if tx + w + 12 > bounds_w:
+        tx = tx - w - 10
+    else:
+        tx = tx + 10
+
+    # Keep tooltip in vertical bounds
+    if ty + total_h > pa_y + 200:
+        ty = max(pa_y, ty - total_h - 10)
+
+    lines = []
+    lines.append(f'<g transform="translate({tx:.1f},{ty:.1f})">')
+    lines.append(f'  <rect width="{w}" height="{total_h}" rx="5" fill="#1a1a1a" stroke="#2a2a2a" stroke-width="0.5"/>')
+    lines.append(f'  <text x="8" y="{pad + 11}" fill="#808080" font-size="9" font-weight="500" '
+                 f'font-family="\'Inter\',sans-serif">{_esc(header)}</text>')
+    lines.append(f'  <line x1="8" y1="{pad + header_h - 4}" x2="{w - 8}" y2="{pad + header_h - 4}" '
+                 f'stroke="#2a2a2a" stroke-width="0.5"/>')
+
+    for idx, (color, label, val_str) in enumerate(entries):
+        ry = pad + header_h + idx * row_h + 12
+        lines.append(f'  <circle cx="14" cy="{ry - 3}" r="3" fill="{color}"/>')
+        lines.append(f'  <text x="22" y="{ry}" fill="#a0a0a0" font-size="9" '
+                     f'font-family="\'Inter\',sans-serif">{_esc(label)}</text>')
+        lines.append(f'  <text x="{w - 8}" y="{ry}" text-anchor="end" fill="#e0e0e0" '
+                     f'font-size="9" font-weight="600" font-family="\'Inter\',sans-serif">{_esc(val_str)}</text>')
+
+    lines.append("</g>")
+    return "\n".join(lines)
+
+
+# ── Hover Overlay Builders ─────────────────────────────────────────────
+
+def _build_line_hover_overlay(sp: SubplotScene, uid: str) -> str:
+    """Build hover overlay for line charts — one tooltip per x-position showing all series."""
+    pa = sp.plot_area
+    w, h = sp.bounds.w, sp.bounds.h
+    line_els = [el for el in sp.elements if isinstance(el, LinePlotElement) and el.points]
+    if not line_els:
+        return ""
+
+    n_points = len(line_els[0].points)
+    if n_points == 0:
+        return ""
+
+    # Build x labels from ticks
+    tick_labels = {round(t.position, 1): t.label for t in sp.x_axis.ticks}
+
+    lines = []
+    for i in range(n_points):
+        px = line_els[0].points[i].x
+
+        # Compute strip boundaries (midpoint between adjacent points)
+        if n_points == 1:
+            strip_l, strip_r = pa.x, pa.x + pa.w
+        else:
+            strip_l = px - (px - line_els[0].points[i - 1].x) / 2 if i > 0 else pa.x
+            strip_r = px + (line_els[0].points[i + 1].x - px) / 2 if i < n_points - 1 else pa.x + pa.w
+
+        # Find closest x-tick label
+        x_label = str(i)
+        best_dist = float("inf")
+        for tp, tl in tick_labels.items():
+            d = abs(tp - px)
+            if d < best_dist:
+                best_dist = d
+                x_label = tl
+
+        # Build entries for all line series at this index
+        entries = []
+        for el in line_els:
+            if i < len(el.data_values):
+                label = el.label or el.color
+                entries.append((el.color, label, _fmt_val(el.data_values[i])))
+
+        tooltip_w = 120
+
+        lines.append(f'<g class="fp-tip">')
+        # Hit area strip
+        lines.append(f'  <rect x="{strip_l:.1f}" y="{pa.y:.1f}" width="{strip_r - strip_l:.1f}" '
+                     f'height="{pa.h:.1f}" fill="transparent"/>')
+
+        lines.append(f'  <g class="fp-tip-content">')
+        # Crosshair
+        lines.append(f'    <line x1="{px:.1f}" y1="{pa.y:.1f}" x2="{px:.1f}" y2="{pa.y + pa.h:.1f}" '
+                     f'stroke="#3a3a3a" stroke-width="0.5" stroke-dasharray="3 2"/>')
+        # Dots on each line
+        for el in line_els:
+            if i < len(el.points):
+                py = el.points[i].y
+                lines.append(f'    <circle cx="{px:.1f}" cy="{py:.1f}" r="3.5" fill="#121212" '
+                             f'stroke="{el.color}" stroke-width="1.2"/>')
+                lines.append(f'    <circle cx="{px:.1f}" cy="{py:.1f}" r="1.5" fill="{el.color}"/>')
+        # Tooltip
+        lines.append(_build_tooltip_box(x_label, entries, px, pa.y + 4, tooltip_w, w, pa.y))
+        lines.append("  </g>")
+        lines.append("</g>")
+
+    return "\n".join(lines)
+
+
+def _build_bar_tooltip(bar, label, x_label, value, color, uid, pa, bounds_w) -> str:
+    """Build a tooltip that appears on bar hover."""
+    entries = [(color, label or "Value", _fmt_val(value))]
+    tx = bar.x + bar.width / 2
+    ty = bar.y - 8
+    tooltip_w = 110
+
+    lines = []
+    lines.append(f'<g class="fp-tip-content">')
+    lines.append(_build_tooltip_box(x_label, entries, tx, ty, tooltip_w, bounds_w, pa.y))
+    lines.append("</g>")
+    return "\n".join(lines)
+
+
+def _build_scatter_hover_overlay(sp: SubplotScene, uid: str) -> str:
+    """Build hover overlay for scatter plots — one tooltip per point."""
+    pa = sp.plot_area
+    w = sp.bounds.w
+    scatter_els = [el for el in sp.elements if isinstance(el, ScatterPlotElement)]
+    if not scatter_els:
+        return ""
+
+    lines = []
+    for el in scatter_els:
+        for i, (px, py, sz) in enumerate(el.points):
+            r = max(math.sqrt(sz), 4)
+            x_val, y_val = el.data_xy[i] if i < len(el.data_xy) else (0, 0)
+            label = el.label or "Point"
+            entries = [
+                (el.color, "x", _fmt_val(x_val)),
+                (el.color, "y", _fmt_val(y_val)),
+            ]
+            tooltip_w = 100
+
+            lines.append(f'<g class="fp-tip">')
+            lines.append(f'  <circle cx="{px:.1f}" cy="{py:.1f}" r="{r + 3:.1f}" fill="transparent"/>')
+            lines.append(f'  <g class="fp-tip-content">')
+            # Highlight ring
+            lines.append(f'    <circle cx="{px:.1f}" cy="{py:.1f}" r="{r + 1:.1f}" '
+                         f'fill="none" stroke="{el.color}" stroke-width="1.5" stroke-opacity="0.6"/>')
+            lines.append(_build_tooltip_box(label, entries, px, py - 8, tooltip_w, w, pa.y))
+            lines.append("  </g>")
+            lines.append("</g>")
+
+    return "\n".join(lines)
+
+
 # ── Subplot Renderer ────────────────────────────────────────────────────
 
-def _render_subplot(sp: SubplotScene, animate: bool, uid: str) -> str:
+def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = True) -> str:
     pa = sp.plot_area
     lines: List[str] = []
     w, h = sp.bounds.w, sp.bounds.h
     theme = get_theme()
 
-    # Timing constants (matching React useChartAnimation)
-    T_GRID = 0.0           # Phase 1 start
-    T_LABELS = 0.675       # Phase 2 start
-    T_DATA = 1.28          # Phase 3 start
-    T_SHIMMER = 2.5        # Shimmer wave start
-    SHIMMER_STEP = 0.08    # 80ms per label step
-    SHIMMER_DUR = 0.24     # Duration of each label's shimmer pulse
+    # Timing constants
+    T_LABELS = 0.675
+    T_DATA = 1.28
+    T_SHIMMER = 2.5
+    SHIMMER_STEP = 0.08
+    SHIMMER_DUR = 0.24
 
-    # Count elements for timing
-    y_tick_count = len(sp.y_axis.ticks)
-    x_tick_count = len(sp.x_axis.ticks)
     bar_count = 0
     for el in sp.elements:
         if isinstance(el, BarPlotElement):
             bar_count = max(bar_count, len(el.bars))
-
-    # Bar sweep timing: starts after grow animation completes
     bar_sweep_start = T_DATA + 0.81 + bar_count * 0.054
-    bar_sweep_step = 0.12  # 120ms per bar
+    bar_sweep_step = 0.12
 
     lines.append(f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w:.1f} {h:.1f}" '
                  f'style="width:100%;height:auto;display:block;font-family:\'Inter\',sans-serif;">')
@@ -157,7 +328,6 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str) -> str:
     lines.append(f'  <stop offset="100%" stop-color="#1F1F1F" stop-opacity="0.05"/>')
     lines.append("</linearGradient>")
 
-    # Bar filters
     bar_series = set()
     for el in sp.elements:
         if isinstance(el, BarPlotElement):
@@ -247,19 +417,13 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str) -> str:
                 if animate:
                     grow_style = f'transform-origin:{bar.x + bar.width/2:.1f}px {pa.y + pa.h:.1f}px;animation:fp-barGrow 0.81s cubic-bezier(0.22,1,0.36,1) {delay:.2f}s both;'
 
-                # Outer hover group
                 lines.append(f'<g class="fp-bar">')
-
-                # Base rect (dark fill, always visible)
                 lines.append(f'  <rect x="{bar.x:.1f}" y="{bar.y:.1f}" width="{bar.width:.1f}" height="{bar.height:.1f}" '
                              f'fill="{theme.bar_default_fill}" style="{grow_style}"/>')
 
-                # Color + glow layers (clipped to bar shape)
                 clip_id = f"bc-{uid}-{si}-{bar.index}"
                 lines.append(f'  <clipPath id="{clip_id}"><rect x="{bar.x:.1f}" y="{bar.y:.1f}" width="{bar.width:.1f}" height="{bar.height:.1f}" style="{grow_style}"/></clipPath>')
 
-                # Glow group — hidden by default, shown on hover via CSS
-                # Sweep animation plays once on load then returns to 0
                 sweep_style = ""
                 if animate:
                     sweep_delay = bar_sweep_start + bar.index * bar_sweep_step
@@ -267,35 +431,28 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str) -> str:
 
                 lines.append(f'  <g class="fp-bar-glow" clip-path="url(#{clip_id})"{sweep_style}>')
 
-                # Color fill
                 lines.append(f'    <rect x="{bar.x:.1f}" y="{bar.y:.1f}" width="{bar.width:.1f}" height="{bar.height:.1f}" fill="{st.fill}" style="{grow_style}"/>')
 
-                # Glow layers with drift classes (activated on hover via CSS)
                 sc = lambda hv: (hv / 134) * bar.height
                 bx, bw = bar.x, bar.width
                 ay, ah = bar.y, bar.height
 
-                # Side glow
                 lines.append(f'    <g class="fp-drift fp-drift1" filter="url(#barSideGlow-{uid}-{si})">')
                 lines.append(f'      <path d="M{bx} {ay+ah+sc(11)} V{ay+ah-sc(0.5)} C{bx} {ay+ah-sc(0.5)} {bx+bw*0.85} {ay+ah-sc(15)} {bx+bw*0.85} {ay+ah-sc(26)} V{ay+sc(21)} C{bx+bw*0.85} {ay+sc(14)} {bx+bw*0.275} {ay+sc(7.69)} {bx} {ay+sc(7.5)} V{ay-sc(4)} C{bx} {ay-sc(4)} {bx+bw*1.225} {ay+sc(4.5)} {bx+bw*1.225} {ay+sc(21)} V{ay+ah-sc(40.5)} C{bx+bw*1.225} {ay+ah-sc(8)} {bx+bw*0.85} {ay+ah-sc(9.5)} {bx} {ay+ah+sc(11)} Z" fill="{st.side_glow}"/>')
                 lines.append("    </g>")
 
-                # Top highlight
                 lines.append(f'    <g class="fp-drift fp-drift2" filter="url(#barTopHL-{uid}-{si})">')
                 lines.append(f'      <rect x="{bx+bw*0.05:.1f}" y="{ay+sc(1):.1f}" width="{bw*0.9:.1f}" height="{sc(8):.1f}" rx="2" fill="{st.top_glow}"/>')
                 lines.append("    </g>")
 
-                # Bottom glow
                 lines.append(f'    <g class="fp-drift fp-drift3" filter="url(#barBotGlow-{uid}-{si})">')
                 lines.append(f'      <path d="M{bx+bw*0.05} {ay+ah-sc(8.2)} C{bx+bw*0.05} {ay+ah-sc(9.2)} {bx+bw*0.05} {ay+ah-sc(4)} {bx+bw*0.17} {ay+ah-sc(1.5)} C{bx+bw*0.28} {ay+ah+sc(0.8)} {bx+bw*0.72} {ay+ah+sc(0.8)} {bx+bw*0.83} {ay+ah-sc(1.5)} C{bx+bw*0.95} {ay+ah-sc(4)} {bx+bw*0.95} {ay+ah-sc(9.2)} {bx+bw*0.95} {ay+ah-sc(8.2)} V{ay+ah} H{bx+bw*0.05} V{ay+ah-sc(8.2)}Z" fill="{st.bottom_glow}"/>')
                 lines.append("    </g>")
 
-                # Left edge glow
                 lines.append(f'    <g class="fp-drift fp-drift1b" filter="url(#barLeftEdge-{uid}-{si})">')
                 lines.append(f'      <path d="M{bx-bw*0.01} {ay+sc(4)} C{bx+bw*0.045} {ay+sc(4)} {bx+bw*0.045} {ay+sc(4)} {bx+bw*0.045} {ay+sc(8)} V{ay+ah-sc(8)} C{bx+bw*0.045} {ay+ah-sc(4)} {bx-bw*0.01} {ay+ah-sc(2)} {bx-bw*0.01} {ay+ah} V{ay+sc(4)}Z" fill="{st.left_edge}"/>')
                 lines.append("    </g>")
 
-                # Sparkle dots (float animation only on hover via CSS)
                 for d_idx, (dcx, dcy, dr) in enumerate(SPARKLE_DOTS):
                     float_name = ["fp-sparkleFloat1", "fp-sparkleFloat2", "fp-sparkleFloat3"][d_idx % 3]
                     dur = 2.5 + (d_idx % 5) * 0.5
@@ -304,22 +461,22 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str) -> str:
                     lines.append(f'    <circle class="fp-sparkle" cx="{bx + dcx * bw:.1f}" cy="{ay + dcy * ah:.1f}" r="{dr}" '
                                  f'fill="{st.sparkle}" style="{sp_var}"/>')
 
-                # Bottom white edge
                 lines.append(f'    <g filter="url(#barBotWhite-{uid}-{si})">')
                 lines.append(f'      <path d="M{bx} {ay+ah-sc(3.5)} L{bx+bw*0.5} {ay+ah-sc(1.5)} L{bx+bw} {ay+ah-sc(3.5)} V{ay+ah} H{bx} V{ay+ah-sc(3.5)}Z" fill="white" fill-opacity="0.8"/>')
                 lines.append("    </g>")
-
-                # Top white edge
                 lines.append(f'    <g filter="url(#barTopWhite-{uid}-{si})">')
                 lines.append(f'      <path d="M{bx} {ay+sc(3.5)} L{bx+bw*0.5} {ay+sc(1.5)} L{bx+bw} {ay+sc(3.5)} V{ay} H{bx} V{ay+sc(3.5)}Z" fill="white" fill-opacity="0.8"/>')
                 lines.append("    </g>")
 
                 lines.append("  </g>")  # close fp-bar-glow
 
-                # Invisible hit area (slightly wider for easier hover targeting)
+                # Hover tooltip for this bar
+                if hover:
+                    x_label = el.x_labels[bar.index] if bar.index < len(el.x_labels) else str(bar.index)
+                    lines.append(_build_bar_tooltip(bar, el.label, x_label, bar.value, el.color, uid, pa, w))
+
                 lines.append(f'  <rect x="{bar.x - 2:.1f}" y="{bar.y - 2:.1f}" width="{bar.width + 4:.1f}" height="{bar.height + 4:.1f}" '
                              f'fill="transparent" style="{grow_style}"/>')
-
                 lines.append("</g>")  # close fp-bar
 
         elif isinstance(el, ScatterPlotElement):
@@ -376,24 +533,29 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str) -> str:
             g += "</g>"
             lines.append(g)
 
+    # ── Hover overlay (rendered last so it's on top) ───────────────────
+    if hover:
+        lines.append(_build_line_hover_overlay(sp, uid))
+        lines.append(_build_scatter_hover_overlay(sp, uid))
+
     lines.append("</svg>")
     return "\n".join(lines)
 
 
 # ── Public API ──────────────────────────────────────────────────────────
 
-def render_svg(scene: Scene, animate: bool = True) -> str:
+def render_svg(scene: Scene, animate: bool = True, hover: bool = True) -> str:
     parts = []
-    if animate:
+    if animate or hover:
         parts.append(f'<style>{_CSS_ANIMATIONS}</style>')
     for i, sp in enumerate(scene.subplots):
-        parts.append(_render_subplot(sp, animate, f"sp{i}"))
+        parts.append(_render_subplot(sp, animate, f"sp{i}", hover=hover))
     return "\n".join(parts)
 
 
-def render_html(scene: Scene, animate: bool = True) -> str:
+def render_html(scene: Scene, animate: bool = True, hover: bool = True) -> str:
     theme = get_theme(scene.theme_name)
-    svg = render_svg(scene, animate)
+    svg = render_svg(scene, animate, hover=hover)
     return f"""<div style="background:{theme.background};padding:16px;border-radius:8px;max-width:660px;">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');

@@ -64,6 +64,7 @@ class LinePlotElement:
     alpha: float = 1
     label: Optional[str] = None
     zorder: int = 0
+    data_values: List[float] = field(default_factory=list)
 
 @dataclass
 class AreaPlotElement:
@@ -83,6 +84,7 @@ class BarPlotElement:
     color: str = "#EF8CFF"
     label: Optional[str] = None
     zorder: int = 0
+    x_labels: List[str] = field(default_factory=list)
 
 @dataclass
 class ScatterPlotElement:
@@ -93,6 +95,7 @@ class ScatterPlotElement:
     alpha: float = 1
     label: Optional[str] = None
     zorder: int = 0
+    data_xy: List[Tuple[float, float]] = field(default_factory=list)
 
 @dataclass
 class HLinePlotElement:
@@ -492,6 +495,7 @@ class Axes:
                     line_style=cmd.opts.get("linestyle", "solid"),
                     alpha=cmd.opts.get("alpha", 1),
                     label=cmd.opts.get("label"), zorder=cmd.opts.get("zorder", z),
+                    data_values=list(cmd.y_data),
                 )
                 elements.append(el)
                 if el.label:
@@ -503,7 +507,8 @@ class Axes:
                 if isinstance(color, list):
                     color = color[0]
                 bars = build_bar_rects(cmd.y_data, bar_si, bar_series_count, pa, y_lo, y_hi, bw, 3, cmd.opts.get("bottom"))
-                el = BarPlotElement(bars=bars, series_index=bar_si, color=color, label=cmd.opts.get("label"), zorder=cmd.opts.get("zorder", z))
+                xlbls = [str(x) for x in cmd.x_data] if cmd.x_data else [str(i) for i in range(len(cmd.y_data))]
+                el = BarPlotElement(bars=bars, series_index=bar_si, color=color, label=cmd.opts.get("label"), zorder=cmd.opts.get("zorder", z), x_labels=xlbls)
                 elements.append(el)
                 if el.label:
                     st = self._theme.bar_styles[bar_si % len(self._theme.bar_styles)]
@@ -513,7 +518,8 @@ class Axes:
             elif isinstance(cmd, _ScatterCmd):
                 color = cmd.opts.get("color", self._theme.default_colors[0])
                 pts = build_scatter_points(cmd.x_data, cmd.y_data, pa, x_lo, x_hi, y_lo, y_hi, cmd.opts.get("s"), self._xscale, self._yscale)
-                el = ScatterPlotElement(points=pts, color=color, marker=cmd.opts.get("marker", "o"), alpha=cmd.opts.get("alpha", 1), label=cmd.opts.get("label"), zorder=cmd.opts.get("zorder", z))
+                raw_xy = list(zip(cmd.x_data, cmd.y_data))
+                el = ScatterPlotElement(points=pts, color=color, marker=cmd.opts.get("marker", "o"), alpha=cmd.opts.get("alpha", 1), label=cmd.opts.get("label"), zorder=cmd.opts.get("zorder", z), data_xy=raw_xy)
                 elements.append(el)
                 if el.label:
                     legend_entries.append(LegendEntry(el.label, color, "scatter"))
@@ -539,7 +545,8 @@ class Axes:
                     by = pa.y + pa.h - ((count - y_lo) / y_range) * pa.h
                     bh = max(1, ((count - y_lo) / y_range) * pa.h)
                     bars.append(BarGeometry(bx, by, bw, bh, count, i))
-                el = BarPlotElement(bars=bars, series_index=0, color=color, label=cmd.opts.get("label"), zorder=cmd.opts.get("zorder", z))
+                xlbls = [f"{edges[i]:.1f}–{edges[i+1]:.1f}" for i in range(len(counts))]
+                el = BarPlotElement(bars=bars, series_index=0, color=color, label=cmd.opts.get("label"), zorder=cmd.opts.get("zorder", z), x_labels=xlbls)
                 elements.append(el)
 
             elif isinstance(cmd, _HLineCmd):
@@ -602,13 +609,14 @@ class Axes:
 # ── Figure Class ────────────────────────────────────────────────────────
 
 class Figure:
-    def __init__(self, width=DEFAULT_WIDTH, height=DEFAULT_HEIGHT, theme="flash-dark"):
+    def __init__(self, width=DEFAULT_WIDTH, height=DEFAULT_HEIGHT, theme="flash-dark", hover=True):
         self._width = width
         self._height = height
         self._theme = get_theme(theme)
         self._nrows = 1
         self._ncols = 1
         self._axes: Dict[str, Axes] = {}
+        self._hover = hover
 
     def subplot(self, nrows: int, ncols: int, index: int) -> Axes:
         self._nrows = max(self._nrows, nrows)
@@ -640,21 +648,28 @@ class Figure:
 
     # ── Display methods ─────────────────────────────────────────────────
 
-    def to_svg(self, animate: bool = True) -> str:
+    def hover(self, enabled: bool = True) -> "Figure":
+        """Enable or disable hover tooltips."""
+        self._hover = enabled
+        return self
+
+    def to_svg(self, animate: bool = True, hover: Optional[bool] = None) -> str:
         from ._render import render_svg
-        return render_svg(self.render(), animate=animate)
+        h = hover if hover is not None else self._hover
+        return render_svg(self.render(), animate=animate, hover=h)
 
-    def to_html(self, animate: bool = True) -> str:
+    def to_html(self, animate: bool = True, hover: Optional[bool] = None) -> str:
         from ._render import render_html
-        return render_html(self.render(), animate=animate)
+        h = hover if hover is not None else self._hover
+        return render_html(self.render(), animate=animate, hover=h)
 
-    def show(self) -> None:
+    def show(self, hover: Optional[bool] = None) -> None:
         """Display in Jupyter/Colab."""
         try:
             from IPython.display import display, HTML
-            display(HTML(self.to_html()))
+            display(HTML(self.to_html(hover=hover)))
         except ImportError:
-            print(self.to_svg(animate=False))
+            print(self.to_svg(animate=False, hover=False))
 
     def savefig(self, path: str, animate: bool = False) -> None:
         if path.endswith(".html"):
@@ -669,5 +684,5 @@ class Figure:
         return self.to_html()
 
 
-def figure(width=DEFAULT_WIDTH, height=DEFAULT_HEIGHT, theme="flash-dark") -> Figure:
-    return Figure(width, height, theme)
+def figure(width=DEFAULT_WIDTH, height=DEFAULT_HEIGHT, theme="flash-dark", hover=True) -> Figure:
+    return Figure(width, height, theme, hover=hover)
