@@ -332,14 +332,14 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
     # Defs
     lines.append("<defs>")
 
-    # Per-area gradients using each area's own color (30% → 10% opacity)
+    # Per-area gradients using each area's own color
     area_grad_ids = {}
     for a_idx, el in enumerate(e for e in sp.elements if isinstance(e, AreaPlotElement)):
         gid = f"areaGrad-{uid}-{a_idx}"
         area_grad_ids[id(el)] = gid
         lines.append(f'<linearGradient id="{gid}" x1="0" y1="0" x2="0" y2="1">')
-        lines.append(f'  <stop offset="0%" stop-color="{el.color}" stop-opacity="0.3"/>')
-        lines.append(f'  <stop offset="100%" stop-color="{el.color}" stop-opacity="0.1"/>')
+        lines.append(f'  <stop offset="0%" stop-color="{el.color}" stop-opacity="0.15"/>')
+        lines.append(f'  <stop offset="100%" stop-color="{el.color}" stop-opacity="0.05"/>')
         lines.append("</linearGradient>")
 
     bar_series = set()
