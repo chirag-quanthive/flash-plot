@@ -312,6 +312,7 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
     SHIMMER_DUR = 0.24
 
     bar_count = 0
+    deferred_bar_tooltips: List[str] = []
     for el in sp.elements:
         if isinstance(el, BarPlotElement):
             bar_count = max(bar_count, len(el.bars))
@@ -512,16 +513,22 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                 lines.append(f'  <rect x="{bar.x - 2:.1f}" y="{bar.y - 2:.1f}" width="{bar.width + 4:.1f}" height="{bar.height + 4:.1f}" '
                              f'fill="transparent" opacity="0"/>')
 
-                # Tooltip inside fp-bar so hover triggers both glow + tooltip
+                # Defer tooltip to top-layer overlay so it's not clipped by adjacent bars
                 if hover:
                     x_label = el.x_labels[bar.index] if bar.index < len(el.x_labels) else str(bar.index)
-                    title_text = f"{x_label}: {_fmt_val(bar.value)}"
-                    lines.append(f'  <g class="fp-tip-content" style="pointer-events:none">')
-                    lines.append(_build_tooltip_box(
+                    tip_lines = []
+                    tip_lines.append(f'<g class="fp-tip">')
+                    tip_lines.append(f'  <rect x="{bar.x - 2:.1f}" y="{bar.y - 2:.1f}" '
+                                     f'width="{bar.width + 4:.1f}" height="{bar.height + 4:.1f}" '
+                                     f'fill="transparent"/>')
+                    tip_lines.append(f'  <g class="fp-tip-content" style="pointer-events:none">')
+                    tip_lines.append(_build_tooltip_box(
                         x_label, [(el.color, el.label or "Value", _fmt_val(bar.value))],
                         bar.x + bar.width / 2, bar.y - 8, 110, w, pa.y,
                     ))
-                    lines.append("  </g>")
+                    tip_lines.append("  </g>")
+                    tip_lines.append("</g>")
+                    deferred_bar_tooltips.append("\n".join(tip_lines))
 
                 lines.append("</g>")  # close fp-bar
 
@@ -581,6 +588,9 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
 
     # ── Hover overlay (rendered last so it's on top of all elements) ───
     if hover:
+        # Bar tooltips deferred to top layer
+        for tip in deferred_bar_tooltips:
+            lines.append(tip)
         lines.append(_build_line_hover_overlay(sp, uid))
         lines.append(_build_scatter_hover_overlay(sp, uid))
 
