@@ -58,12 +58,6 @@ _CSS_ANIMATIONS = """
   100% { opacity: 0; }
 }
 
-/* Base bar fill-in: clip rect grows upward from bottom */
-@keyframes fp-barFillIn {
-  from { transform: scaleY(0); }
-  to { transform: scaleY(1); }
-}
-
 /* Glow drift animations for bar layers */
 @keyframes fp-glowDrift1 {
   0%, 100% { transform: translate(0, 0); }
@@ -471,15 +465,21 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                 lines.append(f'  <clipPath id="{clip_id}"><rect x="{bar.x:.1f}" y="{bar.y:.1f}" width="{bar.width:.1f}" height="{bar.height:.1f}" style="{grow_style}"/></clipPath>')
 
                 if el.is_base:
-                    # Base bars: reveal from bottom using an animated clip rect
+                    # Base bars: reveal from bottom using SMIL-animated clip rect
                     if animate:
                         fillin_delay = bar_sweep_start + bar.index * bar_sweep_step
                         reveal_id = f"rv-{uid}-{bar_el_idx}-{bar.index}"
-                        lines.append(f'  <defs><clipPath id="{reveal_id}">'
-                                     f'<rect x="{bar.x:.1f}" y="{bar.y:.1f}" width="{bar.width:.1f}" height="{bar.height:.1f}" '
-                                     f'style="transform-box:fill-box;transform-origin:center bottom;transform:scaleY(0);'
-                                     f'animation:fp-barFillIn 0.5s cubic-bezier(0.22,1,0.36,1) {fillin_delay:.2f}s forwards"'
-                                     f'/></clipPath></defs>')
+                        bar_bottom = bar.y + bar.height
+                        lines.append(f'  <defs><clipPath id="{reveal_id}">')
+                        lines.append(f'    <rect x="{bar.x:.1f}" y="{bar_bottom:.1f}" width="{bar.width:.1f}" height="0">')
+                        lines.append(f'      <animate attributeName="y" from="{bar_bottom:.1f}" to="{bar.y:.1f}" '
+                                     f'dur="0.5s" begin="{fillin_delay:.2f}s" fill="freeze" calcMode="spline" '
+                                     f'keySplines="0.22 1 0.36 1"/>')
+                        lines.append(f'      <animate attributeName="height" from="0" to="{bar.height:.1f}" '
+                                     f'dur="0.5s" begin="{fillin_delay:.2f}s" fill="freeze" calcMode="spline" '
+                                     f'keySplines="0.22 1 0.36 1"/>')
+                        lines.append(f'    </rect>')
+                        lines.append(f'  </clipPath></defs>')
                         lines.append(f'  <g class="fp-bar-glow fp-bar-base-glow" clip-path="url(#{clip_id})">')
                         lines.append(f'  <g clip-path="url(#{reveal_id})">')
                     else:
