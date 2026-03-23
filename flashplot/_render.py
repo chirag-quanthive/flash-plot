@@ -354,6 +354,28 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
             lines.append("</filter>")
     lines.append("</defs>")
 
+    # ── Title & Subtitle ─────────────────────────────────────────────────
+    if sp.title and sp.title_style:
+        ty = pa.y - 8
+        if sp.subtitle:
+            ty -= 16
+        anim_style = ""
+        if animate:
+            anim_style = f' style="animation:fp-refFade 0.5s ease 0.2s both"'
+        lines.append(f'<text x="{pa.x:.1f}" y="{ty:.1f}" '
+                     f'font-size="{sp.title_style.font_size}" font-weight="{sp.title_style.font_weight}" '
+                     f'font-family="{_esc(sp.title_style.font_family)}" '
+                     f'fill="{sp.title_style.color}"{anim_style}>{_esc(sp.title)}</text>')
+    if sp.subtitle and sp.subtitle_style:
+        sy = pa.y - 6
+        anim_style = ""
+        if animate:
+            anim_style = f' style="animation:fp-refFade 0.5s ease 0.35s both"'
+        lines.append(f'<text x="{pa.x:.1f}" y="{sy:.1f}" '
+                     f'font-size="{sp.subtitle_style.font_size}" font-weight="{sp.subtitle_style.font_weight}" '
+                     f'font-family="{_esc(sp.subtitle_style.font_family)}" '
+                     f'fill="{sp.subtitle_style.color}"{anim_style}>{_esc(sp.subtitle)}</text>')
+
     # ── Grid ────────────────────────────────────────────────────────────
     for i, gl in enumerate(sp.grid.lines):
         ln = math.sqrt((gl.x2 - gl.x1) ** 2 + (gl.y2 - gl.y1) ** 2)
@@ -454,7 +476,7 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                 ay, ah = bar.y, bar.height
 
                 lines.append(f'    <g class="fp-drift fp-drift1" filter="url(#barSideGlow-{uid}-{si})">')
-                lines.append(f'      <path d="M{bx} {ay+ah+sc(11)} V{ay+ah-sc(0.5)} C{bx} {ay+ah-sc(0.5)} {bx+bw*0.85} {ay+ah-sc(15)} {bx+bw*0.85} {ay+ah-sc(26)} V{ay+sc(21)} C{bx+bw*0.85} {ay+sc(14)} {bx+bw*0.275} {ay+sc(7.69)} {bx} {ay+sc(7.5)} V{ay-sc(4)} C{bx} {ay-sc(4)} {bx+bw*1.225} {ay+sc(4.5)} {bx+bw*1.225} {ay+sc(21)} V{ay+ah-sc(40.5)} C{bx+bw*1.225} {ay+ah-sc(8)} {bx+bw*0.85} {ay+ah-sc(9.5)} {bx} {ay+ah+sc(11)} Z" fill="{st.side_glow}"/>')
+                lines.append(f'      <ellipse cx="{bx + bw * 0.5:.1f}" cy="{ay + ah * 0.5:.1f}" rx="{bw * 0.55:.1f}" ry="{ah * 0.45:.1f}" fill="{st.side_glow}"/>')
                 lines.append("    </g>")
 
                 lines.append(f'    <g class="fp-drift fp-drift2" filter="url(#barTopHL-{uid}-{si})">')
@@ -583,7 +605,7 @@ def render_html(scene: Scene, animate: bool = True, hover: bool = True) -> str:
     svg = render_svg(scene, animate, hover=hover)
     return f"""<div style="background:{theme.background};padding:16px;border-radius:8px;max-width:660px;">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=EB+Garamond:wght@400;500&display=swap');
 {_CSS_ANIMATIONS}
 </style>
 {svg}

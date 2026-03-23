@@ -146,6 +146,8 @@ class SubplotScene:
     plot_area: Rect
     title: Optional[str]
     title_style: Optional[TextStyle]
+    subtitle: Optional[str]
+    subtitle_style: Optional[TextStyle]
     x_axis: AxisScene
     y_axis: AxisScene
     grid: GridScene
@@ -233,6 +235,7 @@ class Axes:
         self._theme = theme
         self._commands: List[Any] = []
         self._title: Optional[str] = None
+        self._subtitle: Optional[str] = None
         self._xlabel: Optional[str] = None
         self._ylabel: Optional[str] = None
         self._xlim: Optional[Tuple[float, float]] = None
@@ -303,6 +306,9 @@ class Axes:
     def set_title(self, title: str) -> "Axes":
         self._title = title; return self
 
+    def set_subtitle(self, subtitle: str) -> "Axes":
+        self._subtitle = subtitle; return self
+
     def set_xlabel(self, label: str) -> "Axes":
         self._xlabel = label; return self
 
@@ -342,6 +348,15 @@ class Axes:
 
     def _render(self, bounds: Rect) -> SubplotScene:
         pa = compute_layout(bounds.w, bounds.h)  # plot area relative to (0,0)
+
+        # Push plot area down when title/subtitle present
+        header_h = 0
+        if self._title:
+            header_h += self._theme.title_font_size + 8
+        if self._subtitle:
+            header_h += 16
+        if header_h > 0:
+            pa = Rect(pa.x, pa.y + header_h, pa.w, pa.h - header_h)
 
         # Pre-compute histograms
         hist_results: Dict[int, Tuple[List[float], List[int]]] = {}
@@ -637,6 +652,12 @@ class Axes:
                 font_size=self._theme.title_font_size,
                 font_weight=400, color=self._theme.title_color,
             ) if self._title else None,
+            subtitle=self._subtitle,
+            subtitle_style=TextStyle(
+                font_family=self._theme.axis_font_family,
+                font_size=12,
+                font_weight=400, color=self._theme.text_secondary,
+            ) if self._subtitle else None,
             x_axis=x_axis, y_axis=y_axis, grid=GridScene(grid_visible, grid_axis, grid_lines),
             elements=elements, legend=legend,
         )

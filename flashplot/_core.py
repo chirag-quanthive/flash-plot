@@ -104,7 +104,7 @@ FLASH_DARK = Theme(
     axis_font_size=11,
     axis_font_weight=500,
     axis_letter_spacing="-0.12px",
-    title_font_family="'Instrument Serif', serif",
+    title_font_family="'EB Garamond', 'Times New Roman', 'Instrument Serif', serif",
     title_font_size=18,
     title_color="#ffffff",
     tooltip_bg="#1a1a1a",
@@ -378,9 +378,11 @@ def build_bar_rects(
     bars: List[BarGeometry] = []
     for i, val in enumerate(data):
         bot = bottom[i] if bottom else 0
-        h = max(1, ((val - bot) / y_range) * plot_area.h)
+        val_px = base_y - ((val - y_min) / y_range) * plot_area.h
+        bot_px = base_y - ((bot - y_min) / y_range) * plot_area.h
+        by = min(val_px, bot_px)
+        h = max(1, abs(val_px - bot_px))
         bx = plot_area.x + i * group_w + pad_l + series_idx * (bar_width + pair_gap)
-        by = base_y - ((val - y_min) / y_range) * plot_area.h
         bars.append(BarGeometry(x=bx, y=by, width=bar_width, height=h, value=val, index=i))
     return bars
 
