@@ -313,6 +313,7 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
 
     bar_count = 0
     deferred_bar_tooltips: List[str] = []
+    bar_tip_css_rules: List[str] = []
     for el in sp.elements:
         if isinstance(el, BarPlotElement):
             bar_count = max(bar_count, len(el.bars))
@@ -322,13 +323,10 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
     lines.append(f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w:.1f} {h:.1f}" '
                  f'style="width:100%;height:auto;display:block;font-family:\'Inter\',sans-serif;">')
 
-    # Inline styles for hover (ensures they work inside SVG in all contexts)
+    # Inline styles placeholder — will be finalized after collecting bar tip CSS rules
+    style_insert_idx = len(lines)
     if hover:
-        lines.append("<style>")
-        lines.append(".fp-tip-content{opacity:0;pointer-events:none;transition:opacity .12s ease}")
-        lines.append(".fp-tip:hover .fp-tip-content{opacity:1}")
-        lines.append(".fp-bar:hover .fp-tip-content{opacity:1}")
-        lines.append("</style>")
+        lines.append("")  # placeholder, replaced later
 
     # Defs
     lines.append("<defs>")
@@ -418,7 +416,7 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
     # ── Plot elements ───────────────────────────────────────────────────
     line_idx = 0
     area_idx = 0
-    # Collect bar tooltip data to render in a top-layer overlay (z-index fix)
+    bar_el_idx = 0
     for el in sp.elements:
         if isinstance(el, AreaPlotElement):
             anim_style = ""
@@ -456,7 +454,8 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                 if animate:
                     grow_style = f'transform-origin:{bar.x + bar.width/2:.1f}px {pa.y + pa.h:.1f}px;animation:fp-barGrow 0.81s cubic-bezier(0.22,1,0.36,1) {delay:.2f}s both;'
 
-                lines.append(f'<g class="fp-bar">')
+                bar_id = f"fp-b-{uid}-{bar_el_idx}-{bar.index}"
+                lines.append(f'<g id="{bar_id}" class="fp-bar">')
                 lines.append(f'  <rect x="{bar.x:.1f}" y="{bar.y:.1f}" width="{bar.width:.1f}" height="{bar.height:.1f}" '
                              f'fill="{theme.bar_default_fill}" style="{grow_style}"/>')
 
@@ -513,24 +512,24 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                 lines.append(f'  <rect x="{bar.x - 2:.1f}" y="{bar.y - 2:.1f}" width="{bar.width + 4:.1f}" height="{bar.height + 4:.1f}" '
                              f'fill="transparent" opacity="0"/>')
 
-                # Defer tooltip to top-layer overlay so it's not clipped by adjacent bars
+                # Defer tooltip to top-layer overlay, triggered by bar hover via CSS sibling selector
                 if hover:
                     x_label = el.x_labels[bar.index] if bar.index < len(el.x_labels) else str(bar.index)
+                    tip_id = f"fp-bt-{uid}-{bar_el_idx}-{bar.index}"
                     tip_lines = []
-                    tip_lines.append(f'<g class="fp-tip">')
-                    tip_lines.append(f'  <rect x="{bar.x - 2:.1f}" y="{bar.y - 2:.1f}" '
-                                     f'width="{bar.width + 4:.1f}" height="{bar.height + 4:.1f}" '
-                                     f'fill="transparent"/>')
-                    tip_lines.append(f'  <g class="fp-tip-content" style="pointer-events:none">')
+                    tip_lines.append(f'<g id="{tip_id}" class="fp-bar-tip">')
                     tip_lines.append(_build_tooltip_box(
                         x_label, [(el.color, el.label or "Value", _fmt_val(bar.value))],
                         bar.x + bar.width / 2, bar.y - 8, 110, w, pa.y,
                     ))
-                    tip_lines.append("  </g>")
                     tip_lines.append("</g>")
                     deferred_bar_tooltips.append("\n".join(tip_lines))
+                    bar_tip_css_rules.append(
+                        f"#{bar_id}:hover~#fp-bto-{uid} #{tip_id}{{opacity:1}}"
+                    )
 
                 lines.append("</g>")  # close fp-bar
+            bar_el_idx += 1
 
         elif isinstance(el, ScatterPlotElement):
             for i, (px, py, sz) in enumerate(el.points):
@@ -588,11 +587,26 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
 
     # ── Hover overlay (rendered last so it's on top of all elements) ───
     if hover:
-        # Bar tooltips deferred to top layer
-        for tip in deferred_bar_tooltips:
-            lines.append(tip)
+        # Bar tooltips in a named container, triggered via CSS sibling selectors
+        if deferred_bar_tooltips:
+            lines.append(f'<g id="fp-bto-{uid}" style="pointer-events:none">')
+            for tip in deferred_bar_tooltips:
+                lines.append(tip)
+            lines.append("</g>")
         lines.append(_build_line_hover_overlay(sp, uid))
         lines.append(_build_scatter_hover_overlay(sp, uid))
+
+    # Finalize inline styles
+    if hover:
+        style_parts = [
+            "<style>",
+            ".fp-tip-content{opacity:0;pointer-events:none;transition:opacity .12s ease}",
+            ".fp-tip:hover .fp-tip-content{opacity:1}",
+            ".fp-bar-tip{opacity:0;transition:opacity .12s ease}",
+        ]
+        style_parts.extend(bar_tip_css_rules)
+        style_parts.append("</style>")
+        lines[style_insert_idx] = "\n".join(style_parts)
 
 
     lines.append("</svg>")
