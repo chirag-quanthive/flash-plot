@@ -355,10 +355,10 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
     lines.append("</defs>")
 
     # ── Title & Subtitle ─────────────────────────────────────────────────
+    # Position from top: equal gap above title and below subtitle
     if sp.title and sp.title_style:
-        ty = pa.y - 26
-        if sp.subtitle:
-            ty -= 22
+        title_top = 18  # top margin
+        ty = title_top + sp.title_style.font_size
         anim_style = ""
         if animate:
             anim_style = f' style="animation:fp-refFade 0.5s ease 0.2s both"'
@@ -367,7 +367,7 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                      f'font-family="{_esc(sp.title_style.font_family)}" '
                      f'fill="{sp.title_style.color}"{anim_style}>{_esc(sp.title)}</text>')
     if sp.subtitle and sp.subtitle_style:
-        sy = pa.y - 26
+        sy = 18 + (sp.title_style.font_size + 6 if sp.title else 0) + sp.subtitle_style.font_size
         anim_style = ""
         if animate:
             anim_style = f' style="animation:fp-refFade 0.5s ease 0.35s both"'
