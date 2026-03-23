@@ -378,10 +378,11 @@ def build_bar_rects(
     bars: List[BarGeometry] = []
     for i, val in enumerate(data):
         bot = bottom[i] if bottom else 0
-        val_px = base_y - ((val - y_min) / y_range) * plot_area.h
+        top = bot + val  # actual top of bar segment
+        top_px = base_y - ((top - y_min) / y_range) * plot_area.h
         bot_px = base_y - ((bot - y_min) / y_range) * plot_area.h
-        by = min(val_px, bot_px)
-        h = max(1, abs(val_px - bot_px))
+        by = min(top_px, bot_px)
+        h = max(1, abs(top_px - bot_px))
         bx = plot_area.x + i * group_w + pad_l + series_idx * (bar_width + pair_gap)
         bars.append(BarGeometry(x=bx, y=by, width=bar_width, height=h, value=val, index=i))
     return bars

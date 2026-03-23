@@ -383,8 +383,11 @@ class Axes:
             elif isinstance(cmd, _BarCmd):
                 has_bar = True
                 bar_series_count += 1
-                for v in cmd.y_data:
-                    y_lo, y_hi = min(y_lo, v), max(y_hi, v)
+                bot_vals = cmd.opts.get("bottom")
+                for i, v in enumerate(cmd.y_data):
+                    bot = bot_vals[i] if bot_vals else 0
+                    top = bot + v
+                    y_lo, y_hi = min(y_lo, bot, top), max(y_hi, bot, top)
                 if cmd.x_data and isinstance(cmd.x_data[0], (int, float)):
                     for v in cmd.x_data:
                         x_lo, x_hi = min(x_lo, v), max(x_hi, v)
