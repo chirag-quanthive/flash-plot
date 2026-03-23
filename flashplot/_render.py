@@ -58,10 +58,10 @@ _CSS_ANIMATIONS = """
   100% { opacity: 0; }
 }
 
-/* Base bar fill-in: sequentially fills and stays */
+/* Base bar fill-in: grows upward from bottom and stays */
 @keyframes fp-barFillIn {
-  0% { opacity: 0; }
-  100% { opacity: 1; }
+  0% { transform: scaleY(0); opacity: 1; }
+  100% { transform: scaleY(1); opacity: 1; }
 }
 
 /* Glow drift animations for bar layers */
@@ -471,11 +471,12 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                 lines.append(f'  <clipPath id="{clip_id}"><rect x="{bar.x:.1f}" y="{bar.y:.1f}" width="{bar.width:.1f}" height="{bar.height:.1f}" style="{grow_style}"/></clipPath>')
 
                 if el.is_base:
-                    # Base bars: fill in sequentially and stay filled
+                    # Base bars: fill grows upward from bottom and stays filled
                     glow_style = ""
                     if animate:
                         fillin_delay = bar_sweep_start + bar.index * bar_sweep_step
-                        glow_style = f' style="opacity:0;animation:fp-barFillIn 0.4s ease {fillin_delay:.2f}s forwards"'
+                        origin = f'{bar.x + bar.width/2:.1f}px {bar.y + bar.height:.1f}px'
+                        glow_style = f' style="transform-origin:{origin};transform:scaleY(0);animation:fp-barFillIn 0.5s cubic-bezier(0.22,1,0.36,1) {fillin_delay:.2f}s forwards"'
                     else:
                         glow_style = ' style="opacity:1"'
                     lines.append(f'  <g class="fp-bar-glow fp-bar-base-glow" clip-path="url(#{clip_id})"{glow_style}>')
