@@ -58,10 +58,10 @@ _CSS_ANIMATIONS = """
   100% { opacity: 0; }
 }
 
-/* Base bar fill-in: grows upward from bottom and stays */
+/* Base bar fill-in: clip rect grows upward from bottom */
 @keyframes fp-barFillIn {
-  0% { transform: scaleY(0); opacity: 1; }
-  100% { transform: scaleY(1); opacity: 1; }
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
 }
 
 /* Glow drift animations for bar layers */
@@ -471,15 +471,20 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                 lines.append(f'  <clipPath id="{clip_id}"><rect x="{bar.x:.1f}" y="{bar.y:.1f}" width="{bar.width:.1f}" height="{bar.height:.1f}" style="{grow_style}"/></clipPath>')
 
                 if el.is_base:
-                    # Base bars: fill grows upward from bottom and stays filled
-                    glow_style = ""
+                    # Base bars: reveal from bottom using an animated clip rect
                     if animate:
                         fillin_delay = bar_sweep_start + bar.index * bar_sweep_step
-                        origin = f'{bar.x + bar.width/2:.1f}px {bar.y + bar.height:.1f}px'
-                        glow_style = f' style="transform-origin:{origin};transform:scaleY(0);animation:fp-barFillIn 0.5s cubic-bezier(0.22,1,0.36,1) {fillin_delay:.2f}s forwards"'
+                        reveal_id = f"rv-{uid}-{bar_el_idx}-{bar.index}"
+                        lines.append(f'  <defs><clipPath id="{reveal_id}">'
+                                     f'<rect x="{bar.x:.1f}" y="{bar.y:.1f}" width="{bar.width:.1f}" height="{bar.height:.1f}" '
+                                     f'style="transform-box:fill-box;transform-origin:center bottom;transform:scaleY(0);'
+                                     f'animation:fp-barFillIn 0.5s cubic-bezier(0.22,1,0.36,1) {fillin_delay:.2f}s forwards"'
+                                     f'/></clipPath></defs>')
+                        lines.append(f'  <g class="fp-bar-glow fp-bar-base-glow" clip-path="url(#{clip_id})">')
+                        lines.append(f'  <g clip-path="url(#{reveal_id})">')
                     else:
-                        glow_style = ' style="opacity:1"'
-                    lines.append(f'  <g class="fp-bar-glow fp-bar-base-glow" clip-path="url(#{clip_id})"{glow_style}>')
+                        lines.append(f'  <g class="fp-bar-glow fp-bar-base-glow" clip-path="url(#{clip_id})">')
+                        lines.append(f'  <g>')  # dummy wrapper for consistent closing
                 else:
                     # Stacked/overlay bars: sweep then hide, show on hover
                     sweep_style = ""
@@ -525,6 +530,8 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                 lines.append(f'      <path d="M{bx} {ay+sc(3.5)} L{bx+bw*0.5} {ay+sc(1.5)} L{bx+bw} {ay+sc(3.5)} V{ay} H{bx} V{ay+sc(3.5)}Z" fill="white" fill-opacity="0.8"/>')
                 lines.append("    </g>")
 
+                if el.is_base:
+                    lines.append("  </g>")  # close reveal wrapper
                 lines.append("  </g>")  # close fp-bar-glow
 
                 # Hit area for hover
