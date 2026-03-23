@@ -9,11 +9,13 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 from ._core import (
     Point, Rect, TickMark, TextStyle, Theme, BarGeometry, BarThemeStyle,
+    BoxStats, ViolinStats,
     get_theme,
     compute_ticks, generate_tick_marks, scale_value,
     compute_layout, compute_subplot_bounds,
     build_line_path, build_area_path, build_fill_between_path,
     build_bar_rects, build_scatter_points, compute_histogram_bins,
+    compute_box_stats, compute_violin_kde,
     DEFAULT_WIDTH, DEFAULT_HEIGHT,
 )
 
@@ -135,9 +137,55 @@ class AnnotationPlotElement:
     arrow_width: Optional[float] = None
     zorder: int = 0
 
+@dataclass
+class BoxPlotGroup:
+    """Pixel geometry for one box in a box plot."""
+    center_x: float
+    box_x: float
+    box_w: float
+    box_y_top: float   # Q3 pixel
+    box_y_bot: float   # Q1 pixel
+    median_y: float
+    whisker_lo_y: float
+    whisker_hi_y: float
+    outlier_ys: List[float] = field(default_factory=list)
+    stats: Optional[BoxStats] = None
+
+@dataclass
+class BoxPlotElement:
+    kind: str = "boxplot"
+    groups: List[BoxPlotGroup] = field(default_factory=list)
+    color: str = "#d4d4d4"
+    label: Optional[str] = None
+    x_labels: List[str] = field(default_factory=list)
+    zorder: int = 0
+
+@dataclass
+class ViolinGroup:
+    """Pixel geometry for one violin."""
+    center_x: float
+    left_path: str   # SVG path for left half
+    right_path: str  # SVG path for right half
+    box_x: float
+    box_w: float
+    box_y_top: float
+    box_y_bot: float
+    median_y: float
+    stats: Optional[ViolinStats] = None
+
+@dataclass
+class ViolinPlotElement:
+    kind: str = "violin"
+    groups: List[ViolinGroup] = field(default_factory=list)
+    color: str = "#C084FC"
+    label: Optional[str] = None
+    x_labels: List[str] = field(default_factory=list)
+    zorder: int = 0
+
 PlotElement = Union[
     LinePlotElement, AreaPlotElement, BarPlotElement, ScatterPlotElement,
     HLinePlotElement, VLinePlotElement, TextPlotElement, AnnotationPlotElement,
+    BoxPlotElement, ViolinPlotElement,
 ]
 
 @dataclass
@@ -226,6 +274,18 @@ class _AnnotateCmd:
     xy_text: Optional[Tuple[float, float]] = None
     opts: Dict[str, Any] = field(default_factory=dict)
 
+@dataclass
+class _BoxPlotCmd:
+    kind: str = "boxplot"
+    datasets: List[List[float]] = field(default_factory=list)
+    opts: Dict[str, Any] = field(default_factory=dict)
+
+@dataclass
+class _ViolinCmd:
+    kind: str = "violin"
+    datasets: List[List[float]] = field(default_factory=list)
+    opts: Dict[str, Any] = field(default_factory=dict)
+
 
 # ── Axes Class ──────────────────────────────────────────────────────────
 
@@ -286,6 +346,26 @@ class Axes:
 
     def hist(self, data, **kwargs) -> "Axes":
         self._commands.append(_HistCmd(data=list(data), opts=kwargs))
+        return self
+
+    def boxplot(self, datasets, **kwargs) -> "Axes":
+        """boxplot([list1, list2, ...], labels=..., color=..., width=...)"""
+        ds = [list(d) for d in datasets]
+        if "color" not in kwargs:
+            kwargs["color"] = self._next_color()
+        if "labels" in kwargs and self._xticks is None:
+            self._xticks = list(kwargs["labels"])
+        self._commands.append(_BoxPlotCmd(datasets=ds, opts=kwargs))
+        return self
+
+    def violin(self, datasets, **kwargs) -> "Axes":
+        """violin([list1, list2, ...], labels=..., color=..., width=...)"""
+        ds = [list(d) for d in datasets]
+        if "color" not in kwargs:
+            kwargs["color"] = self._next_color()
+        if "labels" in kwargs and self._xticks is None:
+            self._xticks = list(kwargs["labels"])
+        self._commands.append(_ViolinCmd(datasets=ds, opts=kwargs))
         return self
 
     def axhline(self, y, **kwargs) -> "Axes":
@@ -411,6 +491,15 @@ class Axes:
                 x_lo, x_hi = min(x_lo, edges[0]), max(x_hi, edges[-1])
                 y_lo = min(y_lo, 0)
                 y_hi = max(y_hi, max(counts) * 1.1)
+
+            elif isinstance(cmd, _BoxPlotCmd):
+                for ds in cmd.datasets:
+                    for v in ds:
+                        y_lo, y_hi = min(y_lo, v), max(y_hi, v)
+            elif isinstance(cmd, _ViolinCmd):
+                for ds in cmd.datasets:
+                    for v in ds:
+                        y_lo, y_hi = min(y_lo, v), max(y_hi, v)
 
         if has_bar:
             y_lo = min(y_lo, 0)
@@ -648,6 +737,66 @@ class Axes:
                     color=cmd.opts.get("color", self._theme.text_primary),
                 ), arrow_color=cmd.opts.get("arrowprops", {}).get("color"), arrow_width=cmd.opts.get("arrowprops", {}).get("lw"), zorder=cmd.opts.get("zorder", z))
                 elements.append(el)
+
+            elif isinstance(cmd, _BoxPlotCmd):
+                color = cmd.opts.get("color", self._theme.default_colors[0])
+                labels = cmd.opts.get("labels", [str(i + 1) for i in range(len(cmd.datasets))])
+                box_w_data = cmd.opts.get("width", 0.5)
+                n = len(cmd.datasets)
+                groups: List[BoxPlotGroup] = []
+                for i, ds in enumerate(cmd.datasets):
+                    bs = compute_box_stats(ds, cmd.opts.get("whis", 1.5))
+                    cx = pa.x + (i + 0.5) / n * pa.w
+                    half_w = (pa.w / n) * box_w_data * 0.5
+                    def yp(v: float) -> float:
+                        return pa.y + pa.h - ((v - y_lo) / y_range) * pa.h
+                    groups.append(BoxPlotGroup(
+                        center_x=cx, box_x=cx - half_w, box_w=half_w * 2,
+                        box_y_top=yp(bs.q3), box_y_bot=yp(bs.q1),
+                        median_y=yp(bs.median),
+                        whisker_lo_y=yp(bs.whisker_lo), whisker_hi_y=yp(bs.whisker_hi),
+                        outlier_ys=[yp(o) for o in bs.outliers], stats=bs,
+                    ))
+                el = BoxPlotElement(groups=groups, color=color, label=cmd.opts.get("label"), x_labels=labels, zorder=cmd.opts.get("zorder", z))
+                elements.append(el)
+                if el.label:
+                    legend_entries.append(LegendEntry(el.label, color, "line"))
+
+            elif isinstance(cmd, _ViolinCmd):
+                color = cmd.opts.get("color", self._theme.default_colors[0])
+                labels = cmd.opts.get("labels", [str(i + 1) for i in range(len(cmd.datasets))])
+                vwidth = cmd.opts.get("width", 0.7)
+                n = len(cmd.datasets)
+                vgroups: List[ViolinGroup] = []
+                for i, ds in enumerate(cmd.datasets):
+                    vs = compute_violin_kde(ds)
+                    cx = pa.x + (i + 0.5) / n * pa.w
+                    half_w = (pa.w / n) * vwidth * 0.5
+                    def yp(v: float) -> float:
+                        return pa.y + pa.h - ((v - y_lo) / y_range) * pa.h
+                    # Build mirrored SVG paths
+                    right_pts = []
+                    left_pts = []
+                    for val, dens in vs.kde_points:
+                        py_val = yp(val)
+                        dx = (dens / vs.max_density) * half_w if vs.max_density > 0 else 0
+                        right_pts.append((cx + dx, py_val))
+                        left_pts.append((cx - dx, py_val))
+                    rpath = " ".join(f"{'M' if j == 0 else 'L'}{px:.1f},{py:.1f}" for j, (px, py) in enumerate(right_pts))
+                    lpath = " ".join(f"L{px:.1f},{py:.1f}" for px, py in reversed(left_pts))
+                    full_path = f"{rpath} {lpath} Z"
+                    inner_w = half_w * 0.15
+                    vgroups.append(ViolinGroup(
+                        center_x=cx,
+                        left_path=full_path, right_path=full_path,
+                        box_x=cx - inner_w, box_w=inner_w * 2,
+                        box_y_top=yp(vs.q3), box_y_bot=yp(vs.q1),
+                        median_y=yp(vs.median), stats=vs,
+                    ))
+                el = ViolinPlotElement(groups=vgroups, color=color, label=cmd.opts.get("label"), x_labels=labels, zorder=cmd.opts.get("zorder", z))
+                elements.append(el)
+                if el.label:
+                    legend_entries.append(LegendEntry(el.label, color, "area"))
 
         elements.sort(key=lambda e: e.zorder)
 

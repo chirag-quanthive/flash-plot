@@ -425,3 +425,99 @@ def compute_histogram_bins(
 
 def dash_array(style: str) -> Optional[str]:
     return {"dashed": "8 4", "dotted": "2 3", "dashdot": "8 3 2 3"}.get(style)
+
+
+# ── Box Plot & Violin Plot Stats ─────────────────────────────────────
+
+@dataclass
+class BoxStats:
+    min: float
+    q1: float
+    median: float
+    q3: float
+    max: float
+    outliers: List[float]
+    whisker_lo: float
+    whisker_hi: float
+
+
+def _percentile(sorted_data: List[float], p: float) -> float:
+    """Simple linear interpolation percentile."""
+    n = len(sorted_data)
+    k = (n - 1) * p
+    f = math.floor(k)
+    c = math.ceil(k)
+    if f == c:
+        return sorted_data[int(k)]
+    return sorted_data[f] * (c - k) + sorted_data[c] * (k - f)
+
+
+def compute_box_stats(data: List[float], whis: float = 1.5) -> BoxStats:
+    """Compute box plot statistics: Q1, median, Q3, whiskers, outliers."""
+    s = sorted(data)
+    q1 = _percentile(s, 0.25)
+    med = _percentile(s, 0.5)
+    q3 = _percentile(s, 0.75)
+    iqr = q3 - q1
+    wlo = max(s[0], q1 - whis * iqr)
+    whi = min(s[-1], q3 + whis * iqr)
+    # Snap whiskers to actual data points
+    wlo = min(v for v in s if v >= wlo)
+    whi = max(v for v in s if v <= whi)
+    outliers = [v for v in s if v < wlo or v > whi]
+    return BoxStats(
+        min=s[0], q1=q1, median=med, q3=q3, max=s[-1],
+        outliers=outliers, whisker_lo=wlo, whisker_hi=whi,
+    )
+
+
+@dataclass
+class ViolinStats:
+    kde_points: List[Tuple[float, float]]  # (value, density)
+    max_density: float
+    min_val: float
+    max_val: float
+    q1: float
+    median: float
+    q3: float
+
+
+def compute_violin_kde(
+    data: List[float], n_points: int = 50
+) -> ViolinStats:
+    """Compute KDE for violin plot using Gaussian kernel."""
+    s = sorted(data)
+    n = len(s)
+    lo, hi = s[0], s[-1]
+    rng = hi - lo or 1
+    # Silverman's rule of thumb for bandwidth
+    std = math.sqrt(sum((v - sum(s) / n) ** 2 for v in s) / n) or 1
+    bw = 0.9 * std * n ** (-0.2)
+
+    # Extend range slightly
+    pad = rng * 0.05
+    grid_lo, grid_hi = lo - pad, hi + pad
+    step = (grid_hi - grid_lo) / (n_points - 1)
+
+    kde: List[Tuple[float, float]] = []
+    max_d = 0
+    for i in range(n_points):
+        x = grid_lo + i * step
+        density = 0
+        for v in s:
+            z = (x - v) / bw
+            density += math.exp(-0.5 * z * z) / (bw * 2.5066282746)  # sqrt(2*pi)
+        density /= n
+        if density > max_d:
+            max_d = density
+        kde.append((x, density))
+
+    q1 = _percentile(s, 0.25)
+    med = _percentile(s, 0.5)
+    q3 = _percentile(s, 0.75)
+
+    return ViolinStats(
+        kde_points=kde, max_density=max_d,
+        min_val=lo, max_val=hi,
+        q1=q1, median=med, q3=q3,
+    )

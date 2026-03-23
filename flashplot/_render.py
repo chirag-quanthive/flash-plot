@@ -12,6 +12,7 @@ from ._figure import (
     Scene, SubplotScene, PlotElement,
     LinePlotElement, AreaPlotElement, BarPlotElement, ScatterPlotElement,
     HLinePlotElement, VLinePlotElement, TextPlotElement, AnnotationPlotElement,
+    BoxPlotElement, ViolinPlotElement,
 )
 
 
@@ -603,6 +604,75 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                   f'{_esc(el.text)}</text>')
             g += "</g>"
             lines.append(g)
+
+        elif isinstance(el, BoxPlotElement):
+            for gi, grp in enumerate(el.groups):
+                delay = T_DATA + gi * 0.12
+                anim = ""
+                if animate:
+                    anim = f' style="animation:fp-refFade 0.5s ease {delay:.2f}s both"'
+                lines.append(f'<g class="fp-boxplot"{anim}>')
+                # Whisker lines
+                lines.append(f'  <line x1="{grp.center_x:.1f}" y1="{grp.whisker_hi_y:.1f}" '
+                             f'x2="{grp.center_x:.1f}" y2="{grp.box_y_top:.1f}" '
+                             f'stroke="{el.color}" stroke-width="1" stroke-opacity="0.5"/>')
+                lines.append(f'  <line x1="{grp.center_x:.1f}" y1="{grp.box_y_bot:.1f}" '
+                             f'x2="{grp.center_x:.1f}" y2="{grp.whisker_lo_y:.1f}" '
+                             f'stroke="{el.color}" stroke-width="1" stroke-opacity="0.5"/>')
+                # Whisker caps
+                cap_w = grp.box_w * 0.4
+                lines.append(f'  <line x1="{grp.center_x - cap_w:.1f}" y1="{grp.whisker_hi_y:.1f}" '
+                             f'x2="{grp.center_x + cap_w:.1f}" y2="{grp.whisker_hi_y:.1f}" '
+                             f'stroke="{el.color}" stroke-width="1" stroke-opacity="0.6"/>')
+                lines.append(f'  <line x1="{grp.center_x - cap_w:.1f}" y1="{grp.whisker_lo_y:.1f}" '
+                             f'x2="{grp.center_x + cap_w:.1f}" y2="{grp.whisker_lo_y:.1f}" '
+                             f'stroke="{el.color}" stroke-width="1" stroke-opacity="0.6"/>')
+                # IQR box
+                box_h = grp.box_y_bot - grp.box_y_top
+                lines.append(f'  <rect x="{grp.box_x:.1f}" y="{grp.box_y_top:.1f}" '
+                             f'width="{grp.box_w:.1f}" height="{box_h:.1f}" rx="2" '
+                             f'fill="{el.color}" fill-opacity="0.12" '
+                             f'stroke="{el.color}" stroke-width="1" stroke-opacity="0.4"/>')
+                # Median line
+                lines.append(f'  <line x1="{grp.box_x:.1f}" y1="{grp.median_y:.1f}" '
+                             f'x2="{grp.box_x + grp.box_w:.1f}" y2="{grp.median_y:.1f}" '
+                             f'stroke="{el.color}" stroke-width="2" stroke-opacity="0.9"/>')
+                # Outliers
+                for oy in grp.outlier_ys:
+                    lines.append(f'  <circle cx="{grp.center_x:.1f}" cy="{oy:.1f}" r="2.5" '
+                                 f'fill="none" stroke="{el.color}" stroke-width="1" stroke-opacity="0.5"/>')
+                lines.append("</g>")
+
+        elif isinstance(el, ViolinPlotElement):
+            for gi, grp in enumerate(el.groups):
+                delay = T_DATA + gi * 0.12
+                anim = ""
+                if animate:
+                    anim = f' style="animation:fp-refFade 0.5s ease {delay:.2f}s both"'
+                # Gradient def for this violin
+                vgid = f"violinGrad-{uid}-{gi}"
+                lines.append(f'<defs><linearGradient id="{vgid}" x1="0" y1="0" x2="1" y2="0">')
+                lines.append(f'  <stop offset="0%" stop-color="{el.color}" stop-opacity="0.03"/>')
+                lines.append(f'  <stop offset="40%" stop-color="{el.color}" stop-opacity="0.15"/>')
+                lines.append(f'  <stop offset="50%" stop-color="{el.color}" stop-opacity="0.2"/>')
+                lines.append(f'  <stop offset="60%" stop-color="{el.color}" stop-opacity="0.15"/>')
+                lines.append(f'  <stop offset="100%" stop-color="{el.color}" stop-opacity="0.03"/>')
+                lines.append("</linearGradient></defs>")
+                lines.append(f'<g class="fp-violin"{anim}>')
+                # Violin body (filled KDE shape)
+                lines.append(f'  <path d="{grp.left_path}" fill="url(#{vgid})" '
+                             f'stroke="{el.color}" stroke-width="0.8" stroke-opacity="0.35"/>')
+                # Inner IQR box
+                box_h = grp.box_y_bot - grp.box_y_top
+                lines.append(f'  <rect x="{grp.box_x:.1f}" y="{grp.box_y_top:.1f}" '
+                             f'width="{grp.box_w:.1f}" height="{box_h:.1f}" rx="1.5" '
+                             f'fill="{el.color}" fill-opacity="0.25"/>')
+                # Median dot
+                lines.append(f'  <circle cx="{grp.center_x:.1f}" cy="{grp.median_y:.1f}" r="3" '
+                             f'fill="{el.color}" fill-opacity="0.9"/>')
+                lines.append(f'  <circle cx="{grp.center_x:.1f}" cy="{grp.median_y:.1f}" r="1.5" '
+                             f'fill="#121212"/>')
+                lines.append("</g>")
 
     # ── Hover overlay (rendered last so it's on top of all elements) ───
     if hover:
