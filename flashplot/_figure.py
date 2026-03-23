@@ -352,11 +352,11 @@ class Axes:
         # Push plot area down when title/subtitle present
         header_h = 0
         if self._title:
-            header_h += self._theme.title_font_size + 12
+            header_h += self._theme.title_font_size + 14
         if self._subtitle:
-            header_h += 18
+            header_h += 20
         if header_h > 0:
-            header_h += 12  # gap below header
+            header_h += 20  # gap below header
         if header_h > 0:
             pa = Rect(pa.x, pa.y + header_h, pa.w, pa.h - header_h)
 
