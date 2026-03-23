@@ -382,7 +382,8 @@ class Axes:
                     x_lo, x_hi = min(x_lo, 0), max(x_hi, len(cmd.y_data) - 1)
             elif isinstance(cmd, _BarCmd):
                 has_bar = True
-                bar_series_count += 1
+                if not cmd.opts.get("bottom"):
+                    bar_series_count += 1
                 bot_vals = cmd.opts.get("bottom")
                 for i, v in enumerate(cmd.y_data):
                     bot = bot_vals[i] if bot_vals else 0
@@ -522,18 +523,22 @@ class Axes:
                     legend_entries.append(LegendEntry(el.label, color, "line", el.line_style, el.line_width))
 
             elif isinstance(cmd, _BarCmd):
+                is_stacked = cmd.opts.get("bottom") is not None
+                si = 0 if is_stacked else bar_si
+                ns = max(bar_series_count, 1)
                 bw = cmd.opts.get("width", 20)
-                color = cmd.opts.get("color", self._theme.bar_styles[bar_si % len(self._theme.bar_styles)].fill)
+                color = cmd.opts.get("color", self._theme.bar_styles[si % len(self._theme.bar_styles)].fill)
                 if isinstance(color, list):
                     color = color[0]
-                bars = build_bar_rects(cmd.y_data, bar_si, bar_series_count, pa, y_lo, y_hi, bw, 3, cmd.opts.get("bottom"))
+                bars = build_bar_rects(cmd.y_data, si, ns, pa, y_lo, y_hi, bw, 3, cmd.opts.get("bottom"))
                 xlbls = [str(x) for x in cmd.x_data] if cmd.x_data else [str(i) for i in range(len(cmd.y_data))]
-                el = BarPlotElement(bars=bars, series_index=bar_si, color=color, label=cmd.opts.get("label"), zorder=cmd.opts.get("zorder", z), x_labels=xlbls)
+                el = BarPlotElement(bars=bars, series_index=si, color=color, label=cmd.opts.get("label"), zorder=cmd.opts.get("zorder", z), x_labels=xlbls)
                 elements.append(el)
                 if el.label:
-                    st = self._theme.bar_styles[bar_si % len(self._theme.bar_styles)]
+                    st = self._theme.bar_styles[si % len(self._theme.bar_styles)]
                     legend_entries.append(LegendEntry(el.label, color, "bar", bar_gradient=(st.grad_top, st.grad_bottom)))
-                bar_si += 1
+                if not is_stacked:
+                    bar_si += 1
 
             elif isinstance(cmd, _ScatterCmd):
                 color = cmd.opts.get("color", self._theme.default_colors[0])
