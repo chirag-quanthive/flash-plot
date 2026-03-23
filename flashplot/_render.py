@@ -108,8 +108,8 @@ _CSS_ANIMATIONS = """
 .fp-bar { cursor: pointer; }
 .fp-bar-glow { opacity: 0; transition: opacity 0.35s ease-out; }
 .fp-bar:hover .fp-bar-glow { opacity: 1; transition: opacity 0.15s ease-in; }
-/* Base bars stay filled after animation */
-.fp-bar-base-glow { transition: none; }
+/* Base bars stay filled permanently */
+.fp-bar-base-glow { opacity: 1 !important; transition: none; }
 .fp-bar .fp-drift { animation: none !important; }
 .fp-bar:hover .fp-drift1 { animation: fp-glowDrift1 4s ease-in-out infinite !important; }
 .fp-bar:hover .fp-drift2 { animation: fp-glowDrift2 3.5s ease-in-out 0.3s infinite !important; }
