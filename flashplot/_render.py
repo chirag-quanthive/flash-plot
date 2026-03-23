@@ -605,7 +605,7 @@ def render_html(scene: Scene, animate: bool = True, hover: bool = True) -> str:
     svg = render_svg(scene, animate, hover=hover)
     return f"""<div style="background:{theme.background};padding:16px;border-radius:8px;max-width:660px;">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=EB+Garamond:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Instrument+Serif&display=swap');
 {_CSS_ANIMATIONS}
 </style>
 {svg}
