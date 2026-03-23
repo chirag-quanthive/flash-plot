@@ -486,12 +486,8 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                         lines.append(f'  <g class="fp-bar-glow fp-bar-base-glow" clip-path="url(#{clip_id})">')
                         lines.append(f'  <g>')  # dummy wrapper for consistent closing
                 else:
-                    # Stacked/overlay bars: sweep then hide, show on hover
-                    sweep_style = ""
-                    if animate:
-                        sweep_delay = bar_sweep_start + bar.index * bar_sweep_step
-                        sweep_style = f' style="animation:fp-barSweep 0.4s ease {sweep_delay:.2f}s 1"'
-                    lines.append(f'  <g class="fp-bar-glow" clip-path="url(#{clip_id})"{sweep_style}>')
+                    # Stacked bars: hidden by default, show only on hover
+                    lines.append(f'  <g class="fp-bar-glow" clip-path="url(#{clip_id})">')
 
                 lines.append(f'    <rect x="{bar.x:.1f}" y="{bar.y:.1f}" width="{bar.width:.1f}" height="{bar.height:.1f}" fill="{st.fill}" style="{grow_style}"/>')
 
