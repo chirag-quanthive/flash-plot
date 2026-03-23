@@ -58,6 +58,12 @@ _CSS_ANIMATIONS = """
   100% { opacity: 0; }
 }
 
+/* Base bar fill-in: sequentially fills and stays */
+@keyframes fp-barFillIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
 /* Glow drift animations for bar layers */
 @keyframes fp-glowDrift1 {
   0%, 100% { transform: translate(0, 0); }
@@ -102,6 +108,8 @@ _CSS_ANIMATIONS = """
 .fp-bar { cursor: pointer; }
 .fp-bar-glow { opacity: 0; transition: opacity 0.35s ease-out; }
 .fp-bar:hover .fp-bar-glow { opacity: 1; transition: opacity 0.15s ease-in; }
+/* Base bars stay filled after animation */
+.fp-bar-base-glow { transition: none; }
 .fp-bar .fp-drift { animation: none !important; }
 .fp-bar:hover .fp-drift1 { animation: fp-glowDrift1 4s ease-in-out infinite !important; }
 .fp-bar:hover .fp-drift2 { animation: fp-glowDrift2 3.5s ease-in-out 0.3s infinite !important; }
@@ -459,15 +467,25 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                 lines.append(f'  <rect x="{bar.x:.1f}" y="{bar.y:.1f}" width="{bar.width:.1f}" height="{bar.height:.1f}" '
                              f'fill="{theme.bar_default_fill}" style="{grow_style}"/>')
 
-                clip_id = f"bc-{uid}-{si}-{bar.index}"
+                clip_id = f"bc-{uid}-{bar_el_idx}-{bar.index}"
                 lines.append(f'  <clipPath id="{clip_id}"><rect x="{bar.x:.1f}" y="{bar.y:.1f}" width="{bar.width:.1f}" height="{bar.height:.1f}" style="{grow_style}"/></clipPath>')
 
-                sweep_style = ""
-                if animate:
-                    sweep_delay = bar_sweep_start + bar.index * bar_sweep_step
-                    sweep_style = f' style="animation:fp-barSweep 0.4s ease {sweep_delay:.2f}s 1"'
-
-                lines.append(f'  <g class="fp-bar-glow" clip-path="url(#{clip_id})"{sweep_style}>')
+                if el.is_base:
+                    # Base bars: fill in sequentially and stay filled
+                    glow_style = ""
+                    if animate:
+                        fillin_delay = bar_sweep_start + bar.index * bar_sweep_step
+                        glow_style = f' style="opacity:0;animation:fp-barFillIn 0.4s ease {fillin_delay:.2f}s forwards"'
+                    else:
+                        glow_style = ' style="opacity:1"'
+                    lines.append(f'  <g class="fp-bar-glow fp-bar-base-glow" clip-path="url(#{clip_id})"{glow_style}>')
+                else:
+                    # Stacked/overlay bars: sweep then hide, show on hover
+                    sweep_style = ""
+                    if animate:
+                        sweep_delay = bar_sweep_start + bar.index * bar_sweep_step
+                        sweep_style = f' style="animation:fp-barSweep 0.4s ease {sweep_delay:.2f}s 1"'
+                    lines.append(f'  <g class="fp-bar-glow" clip-path="url(#{clip_id})"{sweep_style}>')
 
                 lines.append(f'    <rect x="{bar.x:.1f}" y="{bar.y:.1f}" width="{bar.width:.1f}" height="{bar.height:.1f}" fill="{st.fill}" style="{grow_style}"/>')
 

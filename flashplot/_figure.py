@@ -85,6 +85,7 @@ class BarPlotElement:
     label: Optional[str] = None
     zorder: int = 0
     x_labels: List[str] = field(default_factory=list)
+    is_base: bool = True
 
 @dataclass
 class ScatterPlotElement:
@@ -532,7 +533,7 @@ class Axes:
                     color = color[0]
                 bars = build_bar_rects(cmd.y_data, si, ns, pa, y_lo, y_hi, bw, 3, cmd.opts.get("bottom"))
                 xlbls = [str(x) for x in cmd.x_data] if cmd.x_data else [str(i) for i in range(len(cmd.y_data))]
-                el = BarPlotElement(bars=bars, series_index=si, color=color, label=cmd.opts.get("label"), zorder=cmd.opts.get("zorder", z), x_labels=xlbls)
+                el = BarPlotElement(bars=bars, series_index=si, color=color, label=cmd.opts.get("label"), zorder=cmd.opts.get("zorder", z), x_labels=xlbls, is_base=not is_stacked)
                 elements.append(el)
                 if el.label:
                     st = self._theme.bar_styles[si % len(self._theme.bar_styles)]
