@@ -343,13 +343,10 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
         lines.append(f'  <stop offset="100%" stop-color="{el.color}" stop-opacity="0.05"/>')
         lines.append("</linearGradient>")
 
-    bar_series = set()
-    for el in sp.elements:
-        if isinstance(el, BarPlotElement):
-            bar_series.add(el.series_index)
-    for si in bar_series:
+    bar_el_count = sum(1 for el in sp.elements if isinstance(el, BarPlotElement))
+    for bei in range(bar_el_count):
         for name, sigma in [("SideGlow", 5), ("TopHL", 4), ("BotGlow", 5), ("LeftEdge", 5), ("BotWhite", 2.25), ("TopWhite", 2.25)]:
-            fid = f"bar{name}-{uid}-{si}"
+            fid = f"bar{name}-{uid}-{bei}"
             lines.append(f'<filter id="{fid}" x="-50%" y="-50%" width="200%" height="200%">')
             lines.append(f'  <feGaussianBlur in="SourceGraphic" stdDeviation="{sigma}"/>')
             lines.append("</filter>")
@@ -449,7 +446,7 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
 
         elif isinstance(el, BarPlotElement):
             si = el.series_index
-            st = theme.bar_styles[si % len(theme.bar_styles)]
+            st = theme.bar_styles[bar_el_idx % len(theme.bar_styles)]
             for bar in el.bars:
                 delay = T_DATA + bar.index * 0.054
                 grow_style = ""
@@ -495,19 +492,19 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                 bx, bw = bar.x, bar.width
                 ay, ah = bar.y, bar.height
 
-                lines.append(f'    <g class="fp-drift fp-drift1" filter="url(#barSideGlow-{uid}-{si})">')
+                lines.append(f'    <g class="fp-drift fp-drift1" filter="url(#barSideGlow-{uid}-{bar_el_idx})">')
                 lines.append(f'      <ellipse cx="{bx + bw * 0.5:.1f}" cy="{ay + ah * 0.5:.1f}" rx="{bw * 0.55:.1f}" ry="{ah * 0.45:.1f}" fill="{st.side_glow}"/>')
                 lines.append("    </g>")
 
-                lines.append(f'    <g class="fp-drift fp-drift2" filter="url(#barTopHL-{uid}-{si})">')
+                lines.append(f'    <g class="fp-drift fp-drift2" filter="url(#barTopHL-{uid}-{bar_el_idx})">')
                 lines.append(f'      <rect x="{bx+bw*0.05:.1f}" y="{ay+sc(1):.1f}" width="{bw*0.9:.1f}" height="{sc(8):.1f}" rx="2" fill="{st.top_glow}"/>')
                 lines.append("    </g>")
 
-                lines.append(f'    <g class="fp-drift fp-drift3" filter="url(#barBotGlow-{uid}-{si})">')
+                lines.append(f'    <g class="fp-drift fp-drift3" filter="url(#barBotGlow-{uid}-{bar_el_idx})">')
                 lines.append(f'      <path d="M{bx+bw*0.05} {ay+ah-sc(8.2)} C{bx+bw*0.05} {ay+ah-sc(9.2)} {bx+bw*0.05} {ay+ah-sc(4)} {bx+bw*0.17} {ay+ah-sc(1.5)} C{bx+bw*0.28} {ay+ah+sc(0.8)} {bx+bw*0.72} {ay+ah+sc(0.8)} {bx+bw*0.83} {ay+ah-sc(1.5)} C{bx+bw*0.95} {ay+ah-sc(4)} {bx+bw*0.95} {ay+ah-sc(9.2)} {bx+bw*0.95} {ay+ah-sc(8.2)} V{ay+ah} H{bx+bw*0.05} V{ay+ah-sc(8.2)}Z" fill="{st.bottom_glow}"/>')
                 lines.append("    </g>")
 
-                lines.append(f'    <g class="fp-drift fp-drift1b" filter="url(#barLeftEdge-{uid}-{si})">')
+                lines.append(f'    <g class="fp-drift fp-drift1b" filter="url(#barLeftEdge-{uid}-{bar_el_idx})">')
                 lines.append(f'      <path d="M{bx-bw*0.01} {ay+sc(4)} C{bx+bw*0.045} {ay+sc(4)} {bx+bw*0.045} {ay+sc(4)} {bx+bw*0.045} {ay+sc(8)} V{ay+ah-sc(8)} C{bx+bw*0.045} {ay+ah-sc(4)} {bx-bw*0.01} {ay+ah-sc(2)} {bx-bw*0.01} {ay+ah} V{ay+sc(4)}Z" fill="{st.left_edge}"/>')
                 lines.append("    </g>")
 
@@ -519,10 +516,10 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                     lines.append(f'    <circle class="fp-sparkle" cx="{bx + dcx * bw:.1f}" cy="{ay + dcy * ah:.1f}" r="{dr}" '
                                  f'fill="{st.sparkle}" style="{sp_var}"/>')
 
-                lines.append(f'    <g filter="url(#barBotWhite-{uid}-{si})">')
+                lines.append(f'    <g filter="url(#barBotWhite-{uid}-{bar_el_idx})">')
                 lines.append(f'      <path d="M{bx} {ay+ah-sc(3.5)} L{bx+bw*0.5} {ay+ah-sc(1.5)} L{bx+bw} {ay+ah-sc(3.5)} V{ay+ah} H{bx} V{ay+ah-sc(3.5)}Z" fill="white" fill-opacity="0.8"/>')
                 lines.append("    </g>")
-                lines.append(f'    <g filter="url(#barTopWhite-{uid}-{si})">')
+                lines.append(f'    <g filter="url(#barTopWhite-{uid}-{bar_el_idx})">')
                 lines.append(f'      <path d="M{bx} {ay+sc(3.5)} L{bx+bw*0.5} {ay+sc(1.5)} L{bx+bw} {ay+sc(3.5)} V{ay} H{bx} V{ay+sc(3.5)}Z" fill="white" fill-opacity="0.8"/>')
                 lines.append("    </g>")
 
