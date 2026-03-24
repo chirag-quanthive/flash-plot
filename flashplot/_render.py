@@ -969,6 +969,27 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
 
     lines.append('</g>')
 
+    # ── 3D toggle button (only for charts with surface plots) ─────────
+    has_surface = any(isinstance(el, SurfacePlotElement) for el in sp.elements)
+    if has_surface:
+        tb_w, tb_h = 32, 20
+        tb_x = w - tb_w - 10
+        tb_y = h - tb_h - 8
+        lines.append(f'<g id="fp-3d-btn-{uid}" cursor="pointer" '
+                     f'onclick="(function(e){{'
+                     f'var s=e.currentTarget.ownerSVGElement;'
+                     f'var ev=new CustomEvent(\'fp-toggle3d\',{{detail:{{uid:\'{uid}\'}}}});'
+                     f's.dispatchEvent(ev);'
+                     f'}})(event)">')
+        lines.append(f'  <rect class="fp-panel-bg" x="{tb_x:.1f}" y="{tb_y:.1f}" '
+                     f'width="{tb_w}" height="{tb_h}" rx="5" '
+                     f'fill="#1e1e1e" stroke="#3a3a3a" stroke-width="0.5"/>')
+        lines.append(f'  <text id="fp-3d-lbl-{uid}" class="fp-panel-text" '
+                     f'x="{tb_x + tb_w / 2:.1f}" y="{tb_y + 14:.1f}" '
+                     f'text-anchor="middle" font-size="10" font-weight="700" '
+                     f'font-family="\'Inter\',sans-serif" fill="#707070">3D</text>')
+        lines.append('</g>')
+
     lines.append("</svg>")
     return "\n".join(lines)
 
@@ -1006,13 +1027,10 @@ for(var si=0;si<svgs.length;si++){(function(S){
     var gSL=S.querySelector('.fp-surface-light');
     var gA2=S.querySelector('[id="fp-axis-'+uid+'"]');
     var gG=S.querySelector('[id="fp-grid-'+uid+'"]');
+    var btnLbl=S.querySelector('#fp-3d-lbl-'+uid);
     if(!gJ)return;
 
-    // Hide static surfaces and 2D axes/grid
-    if(gSD)gSD.setAttribute('display','none');
-    if(gSL)gSL.setAttribute('display','none');
-    if(gA2)gA2.setAttribute('display','none');
-    if(gG)gG.setAttribute('display','none');
+    var is3D=false;
 
     function proj(x,y,z){
       var ca=Math.cos(az),sa=Math.sin(az),ce=Math.cos(el),se=Math.sin(el);
@@ -1122,7 +1140,39 @@ for(var si=0;si<svgs.length;si++){(function(S){
       gA3.innerHTML=h;
     }
 
-    // Drag handling
+    // Toggle between 2D static and 3D interactive
+    function enter3D(){
+      is3D=true;
+      if(gSD)gSD.setAttribute('display','none');
+      if(gSL)gSL.setAttribute('display','none');
+      if(gA2)gA2.setAttribute('display','none');
+      if(gG)gG.setAttribute('display','none');
+      gJ.setAttribute('display','block');
+      gA3.setAttribute('display','block');
+      if(btnLbl)btnLbl.textContent='2D';
+      S.style.cursor='grab';
+      render();
+    }
+    function exit3D(){
+      is3D=false;
+      cancelAnimationFrame(aId);
+      gJ.innerHTML='';gJ.setAttribute('display','none');
+      gA3.innerHTML='';gA3.setAttribute('display','none');
+      // Restore static view
+      var dk=S.getAttribute('class').indexOf('fp-dark')>=0;
+      if(gSD)gSD.setAttribute('display',dk?'block':'none');
+      if(gSL)gSL.setAttribute('display',dk?'none':'block');
+      if(gA2)gA2.setAttribute('display','block');
+      if(gG)gG.setAttribute('display','block');
+      if(btnLbl)btnLbl.textContent='3D';
+      S.style.cursor='';
+    }
+    // Listen for toggle event from the 3D button
+    S.addEventListener('fp-toggle3d',function(e){
+      if(e.detail&&e.detail.uid===uid){is3D?exit3D():enter3D();}
+    });
+
+    // Drag handling (only active in 3D mode)
     var drag=false,sX,sY,sAz,sEl,vAz=0,vEl=0,aId=0;
     var vb=S.getAttribute('viewBox').split(' ').map(Number);
 
@@ -1133,6 +1183,7 @@ for(var si=0;si<svgs.length;si++){(function(S){
     function inPA(mx,my){return mx>=pa.x&&mx<=pa.x+pa.w&&my>=pa.y&&my<=pa.y+pa.h;}
 
     S.addEventListener('mousedown',function(e){
+      if(!is3D)return;
       var m=svgXY(e);if(!inPA(m[0],m[1]))return;
       drag=true;sX=e.clientX;sY=e.clientY;sAz=az;sEl=el;
       vAz=0;vEl=0;cancelAnimationFrame(aId);
@@ -1154,7 +1205,7 @@ for(var si=0;si<svgs.length;si++){(function(S){
 
     // Touch support
     S.addEventListener('touchstart',function(e){
-      if(e.touches.length!==1)return;var t=e.touches[0];
+      if(!is3D||e.touches.length!==1)return;var t=e.touches[0];
       var m=svgXY(t);if(!inPA(m[0],m[1]))return;
       drag=true;sX=t.clientX;sY=t.clientY;sAz=az;sEl=el;
       vAz=0;vEl=0;cancelAnimationFrame(aId);e.preventDefault();
@@ -1172,9 +1223,6 @@ for(var si=0;si<svgs.length;si++){(function(S){
         az+=vAz;el=Math.max(-1.4,Math.min(1.4,el+vEl));
         vAz*=.92;vEl*=.92;render();aId=requestAnimationFrame(m);})();
     });
-
-    S.style.cursor='grab';
-    render();
   });
 })(svgs[si]);}
 })();
