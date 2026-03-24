@@ -118,6 +118,24 @@ _CSS_ANIMATIONS = """
 .fp-tip-content { opacity: 0; pointer-events: none; transition: opacity 0.12s ease; }
 .fp-tip:hover .fp-tip-content { opacity: 1; }
 .fp-bar:hover .fp-tip-content { opacity: 1; }
+
+/* ── Theme: light mode overrides ──────────────────────────────────── */
+.fp-light .fp-bg { fill: #f8f8f8; }
+.fp-light .fp-grid-line { stroke: #e0e0e0 !important; }
+.fp-light .fp-ax { fill: #888888 !important; }
+.fp-light .fp-title-text { fill: #111111 !important; }
+.fp-light .fp-subtitle-text { fill: #666666 !important; }
+.fp-light .fp-cfg-chevron { stroke: #999999 !important; }
+.fp-light .fp-panel-bg { fill: #ffffff !important; stroke: #e0e0e0 !important; }
+.fp-light .fp-panel-text { fill: #555555 !important; }
+.fp-light .fp-panel-check-box { stroke: #cccccc !important; }
+.fp-light .fp-panel-check-mark { stroke: #555555 !important; }
+.fp-light .fp-tip-bg { fill: #ffffff !important; stroke: #e0e0e0 !important; }
+.fp-light .fp-tip-header { fill: #888888 !important; }
+.fp-light .fp-tip-label { fill: #555555 !important; }
+.fp-light .fp-tip-value { fill: #222222 !important; }
+.fp-light .fp-legend-text { fill: #555555 !important; }
+.fp-light .fp-bar { --fp-bar-fill: #f0f0f0; }
 """
 
 
@@ -156,8 +174,8 @@ def _surface_color(z_norm: float, shade: float, base_color: str,
     return f"#{r:02x}{g:02x}{b:02x}"
 
 
-# Default dark-theme colormap
-DARK_COLORMAP = ["#1a0a2e", "#3a1b6b", "#6b3fa0", "#9b6fcc", "#c9a0f0", "#67E8F9"]
+# Default dark-theme colormap — bright, visible on dark backgrounds
+DARK_COLORMAP = ["#6b3fa0", "#9b6fcc", "#c9a0f0", "#67E8F9", "#a5f3fc", "#f0abfc"]
 
 
 def _esc(s: str) -> str:
@@ -203,18 +221,18 @@ def _build_tooltip_box(
 
     lines = []
     lines.append(f'<g transform="translate({tx:.1f},{ty:.1f})">')
-    lines.append(f'  <rect width="{w}" height="{total_h}" rx="5" fill="#1a1a1a" stroke="#2a2a2a" stroke-width="0.5"/>')
-    lines.append(f'  <text x="8" y="{pad + 11}" fill="#808080" font-size="9" font-weight="500" '
+    lines.append(f'  <rect class="fp-tip-bg" width="{w}" height="{total_h}" rx="5" fill="#1a1a1a" stroke="#2a2a2a" stroke-width="0.5"/>')
+    lines.append(f'  <text class="fp-tip-header" x="8" y="{pad + 11}" fill="#808080" font-size="9" font-weight="500" '
                  f'font-family="\'Inter\',sans-serif">{_esc(header)}</text>')
-    lines.append(f'  <line x1="8" y1="{pad + header_h - 4}" x2="{w - 8}" y2="{pad + header_h - 4}" '
+    lines.append(f'  <line class="fp-tip-bg" x1="8" y1="{pad + header_h - 4}" x2="{w - 8}" y2="{pad + header_h - 4}" '
                  f'stroke="#2a2a2a" stroke-width="0.5"/>')
 
     for idx, (color, label, val_str) in enumerate(entries):
         ry = pad + header_h + idx * row_h + 12
         lines.append(f'  <circle cx="14" cy="{ry - 3}" r="3" fill="{color}"/>')
-        lines.append(f'  <text x="22" y="{ry}" fill="#a0a0a0" font-size="9" '
+        lines.append(f'  <text class="fp-tip-label" x="22" y="{ry}" fill="#a0a0a0" font-size="9" '
                      f'font-family="\'Inter\',sans-serif">{_esc(label)}</text>')
-        lines.append(f'  <text x="{w - 8}" y="{ry}" text-anchor="end" fill="#e0e0e0" '
+        lines.append(f'  <text class="fp-tip-value" x="{w - 8}" y="{ry}" text-anchor="end" fill="#e0e0e0" '
                      f'font-size="9" font-weight="600" font-family="\'Inter\',sans-serif">{_esc(val_str)}</text>')
 
     lines.append("</g>")
@@ -363,7 +381,11 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
     bar_sweep_step = 0.12
 
     lines.append(f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w:.1f} {h:.1f}" '
+                 f'class="fp-dark" '
                  f'style="width:100%;height:auto;display:block;font-family:\'Inter\',sans-serif;">')
+
+    # Background rect (themed)
+    lines.append(f'<rect class="fp-bg" width="{w:.1f}" height="{h:.1f}" fill="{theme.background}" rx="4"/>')
 
     # Inline styles placeholder — will be finalized after collecting bar tip CSS rules
     style_insert_idx = len(lines)
@@ -400,7 +422,7 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
         anim_style = ""
         if animate:
             anim_style = f' style="animation:fp-refFade 0.5s ease 0.2s both"'
-        lines.append(f'<text x="{pa.x:.1f}" y="{ty:.1f}" '
+        lines.append(f'<text class="fp-title-text" x="{pa.x:.1f}" y="{ty:.1f}" '
                      f'font-size="{sp.title_style.font_size}" font-weight="{sp.title_style.font_weight}" '
                      f'font-family="{_esc(sp.title_style.font_family)}" '
                      f'fill="{sp.title_style.color}"{anim_style}>{_esc(sp.title)}</text>')
@@ -409,7 +431,7 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
         anim_style = ""
         if animate:
             anim_style = f' style="animation:fp-refFade 0.5s ease 0.35s both"'
-        lines.append(f'<text x="{pa.x:.1f}" y="{sy:.1f}" '
+        lines.append(f'<text class="fp-subtitle-text" x="{pa.x:.1f}" y="{sy:.1f}" '
                      f'font-size="{sp.subtitle_style.font_size}" font-weight="{sp.subtitle_style.font_weight}" '
                      f'font-family="{_esc(sp.subtitle_style.font_family)}" '
                      f'fill="{sp.subtitle_style.color}"{anim_style}>{_esc(sp.subtitle)}</text>')
@@ -422,7 +444,7 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
         if animate:
             anim = (f' style="--fp-len:{ln:.1f};stroke-dasharray:{ln:.1f};'
                     f'animation:fp-gridDraw 0.675s cubic-bezier(0.22,1,0.36,1) {i*0.08:.2f}s both"')
-        lines.append(f'<line x1="{gl.x1:.1f}" y1="{gl.y1:.1f}" x2="{gl.x2:.1f}" y2="{gl.y2:.1f}" '
+        lines.append(f'<line class="fp-grid-line" x1="{gl.x1:.1f}" y1="{gl.y1:.1f}" x2="{gl.x2:.1f}" y2="{gl.y2:.1f}" '
                      f'stroke="{gl.color}" stroke-width="{gl.width}"{anim}/>')
     lines.append('</g>')
 
@@ -439,7 +461,7 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
             shimmer_delay = T_SHIMMER + i * SHIMMER_STEP
             shimmer = f'fp-shimmer {SHIMMER_DUR}s ease {shimmer_delay:.2f}s 1'
             anim_style = f'--fp-base:{ts.color};animation:{fade},{shimmer};'
-        lines.append(f'<text x="{pa.x - 4:.1f}" y="{t.position + 3:.1f}" text-anchor="end" '
+        lines.append(f'<text class="fp-ax" x="{pa.x - 4:.1f}" y="{t.position + 3:.1f}" text-anchor="end" '
                      f'font-size="{ts.font_size}" font-weight="{ts.font_weight}" '
                      f'font-family="{_esc(ts.font_family)}" letter-spacing="{ts.letter_spacing}" '
                      f'fill="{ts.color}" style="{anim_style}">{_esc(t.label)}</text>')
@@ -455,7 +477,7 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
             shimmer_delay = T_SHIMMER + i * SHIMMER_STEP
             shimmer = f'fp-shimmer {SHIMMER_DUR}s ease {shimmer_delay:.2f}s 1'
             anim_style = f'--fp-base:{ts.color};animation:{fade},{shimmer};'
-        lines.append(f'<text x="{t.position:.1f}" y="{h - 4:.1f}" text-anchor="middle" '
+        lines.append(f'<text class="fp-ax" x="{t.position:.1f}" y="{h - 4:.1f}" text-anchor="middle" '
                      f'font-size="{ts.font_size}" font-weight="{ts.font_weight}" '
                      f'font-family="{_esc(ts.font_family)}" letter-spacing="{ts.letter_spacing}" '
                      f'fill="{ts.color}" style="{anim_style}">{_esc(t.label)}</text>')
@@ -775,7 +797,7 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                 extra = f' stroke-dasharray="{da}"' if da else ""
                 lines.append(f'  <line x1="{leg_x - 82:.1f}" y1="{ly + 5:.1f}" x2="{leg_x - 68:.1f}" y2="{ly + 5:.1f}" '
                              f'stroke="{le.color}" stroke-width="{le.line_width or 1.5}"{extra}/>')
-            lines.append(f'  <text x="{leg_x - 62:.1f}" y="{ly + 9:.1f}" font-size="9" font-weight="500" '
+            lines.append(f'  <text class="fp-legend-text" x="{leg_x - 62:.1f}" y="{ly + 9:.1f}" font-size="9" font-weight="500" '
                          f'font-family="\'Inter\',sans-serif" fill="#808080">{_esc(le.label)}</text>')
         lines.append('</g>')
 
@@ -807,7 +829,7 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
     btn_x = w - 28
     btn_y = 14
     panel_w = 148
-    panel_h = 104
+    panel_h = 140
     panel_x = w - panel_w - 8
     panel_y = btn_y + 22
 
@@ -820,13 +842,13 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                  f'}})(event)">')
     lines.append(f'  <rect x="{btn_x - 4:.1f}" y="{btn_y - 4:.1f}" width="20" height="20" rx="4" '
                  f'fill="transparent"/>')
-    lines.append(f'  <path d="M{btn_x:.1f} {btn_y + 3:.1f} l5 5 l5 -5" fill="none" '
+    lines.append(f'  <path class="fp-cfg-chevron" d="M{btn_x:.1f} {btn_y + 3:.1f} l5 5 l5 -5" fill="none" '
                  f'stroke="#606060" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>')
     lines.append('</g>')
 
     # Settings panel (hidden by default)
     lines.append(f'<g id="fp-cfg-panel-{uid}" display="none">')
-    lines.append(f'  <rect x="{panel_x:.1f}" y="{panel_y:.1f}" width="{panel_w}" height="{panel_h}" '
+    lines.append(f'  <rect class="fp-panel-bg" x="{panel_x:.1f}" y="{panel_y:.1f}" width="{panel_w}" height="{panel_h}" '
                  f'rx="6" fill="#1a1a1a" stroke="#2a2a2a" stroke-width="0.5"/>')
 
     toggle_items = [
@@ -836,7 +858,7 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
     ]
 
     for ti, (label, target_id, enabled) in enumerate(toggle_items):
-        ry = panel_y + 12 + ti * 30
+        ry = panel_y + 12 + ti * 28
         check_x = panel_x + 12
         check_y = ry
         text_x = panel_x + 34
@@ -851,15 +873,67 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                      f'var ck=e.currentTarget.querySelector(\'.fp-ck\');'
                      f'ck.setAttribute(\'opacity\',vis?\'0\':\'1\');'
                      f'}})(event)">')
-        lines.append(f'    <rect x="{check_x:.1f}" y="{check_y:.1f}" width="14" height="14" rx="3" '
+        lines.append(f'    <rect class="fp-panel-check-box" x="{check_x:.1f}" y="{check_y:.1f}" width="14" height="14" rx="3" '
                      f'fill="none" stroke="#494949" stroke-width="0.8"/>')
         opacity = "1" if enabled else "0"
-        lines.append(f'    <path class="fp-ck" d="M{check_x + 3:.1f} {check_y + 7:.1f} l3 3 l5 -6" '
+        lines.append(f'    <path class="fp-ck fp-panel-check-mark" d="M{check_x + 3:.1f} {check_y + 7:.1f} l3 3 l5 -6" '
                      f'fill="none" stroke="#808080" stroke-width="1.3" stroke-linecap="round" '
                      f'stroke-linejoin="round" opacity="{opacity}"/>')
-        lines.append(f'    <text x="{text_x:.1f}" y="{text_y:.1f}" font-size="10" font-weight="500" '
+        lines.append(f'    <text class="fp-panel-text" x="{text_x:.1f}" y="{text_y:.1f}" font-size="10" font-weight="500" '
                      f'font-family="\'Inter\',sans-serif" fill="#808080">{label}</text>')
         lines.append('  </g>')
+
+    # ── Theme toggle (Dark / Light) ───────────────────────────────────
+    # Separator line
+    sep_y = panel_y + 12 + len(toggle_items) * 28
+    lines.append(f'  <line x1="{panel_x + 10:.1f}" y1="{sep_y:.1f}" x2="{panel_x + panel_w - 10:.1f}" y2="{sep_y:.1f}" '
+                 f'stroke="#2a2a2a" stroke-width="0.5" class="fp-panel-check-box"/>')
+
+    theme_y = sep_y + 8
+    theme_text_y = theme_y + 11
+    # Dark label
+    dark_x = panel_x + 14
+    light_x = panel_x + panel_w / 2 + 4
+    pill_w = panel_w / 2 - 18
+    pill_h = 22
+
+    # Theme toggle JS: swaps SVG class, updates parent div bg, toggles pill highlight
+    theme_js = (
+        f"(function(e){{"
+        f"var s=e.currentTarget.ownerSVGElement;"
+        f"var isDark=s.getAttribute('class').indexOf('fp-dark')>=0;"
+        f"var mode=e.currentTarget.getAttribute('data-mode');"
+        f"if((mode==='dark'&&isDark)||(mode==='light'&&!isDark))return;"
+        f"s.setAttribute('class',mode==='dark'?'fp-dark':'fp-light');"
+        f"var bg=s.querySelector('.fp-bg');"
+        f"bg.setAttribute('fill',mode==='dark'?'{theme.background}':'#f8f8f8');"
+        f"var div=s.parentElement;"
+        f"if(div&&div.tagName==='DIV')div.style.background=mode==='dark'?'{theme.background}':'#f8f8f8';"
+        f"var dp=s.getElementById('fp-theme-dark-{uid}');"
+        f"var lp=s.getElementById('fp-theme-light-{uid}');"
+        f"var pc=mode==='dark'?'#2a2a2a':'#e8e8e8';"
+        f"dp.setAttribute('fill',mode==='dark'?pc:'none');"
+        f"lp.setAttribute('fill',mode==='light'?pc:'none');"
+        f"}})(event)"
+    )
+
+    # Dark pill
+    lines.append(f'  <g cursor="pointer" data-mode="dark" onclick="{theme_js}">')
+    lines.append(f'    <rect id="fp-theme-dark-{uid}" x="{dark_x:.1f}" y="{theme_y:.1f}" '
+                 f'width="{pill_w:.1f}" height="{pill_h}" rx="4" fill="#2a2a2a"/>')
+    lines.append(f'    <text class="fp-panel-text" x="{dark_x + pill_w / 2:.1f}" y="{theme_text_y:.1f}" '
+                 f'text-anchor="middle" font-size="9" font-weight="600" '
+                 f'font-family="\'Inter\',sans-serif" fill="#808080">Dark</text>')
+    lines.append('  </g>')
+
+    # Light pill
+    lines.append(f'  <g cursor="pointer" data-mode="light" onclick="{theme_js}">')
+    lines.append(f'    <rect id="fp-theme-light-{uid}" x="{light_x:.1f}" y="{theme_y:.1f}" '
+                 f'width="{pill_w:.1f}" height="{pill_h}" rx="4" fill="none"/>')
+    lines.append(f'    <text class="fp-panel-text" x="{light_x + pill_w / 2:.1f}" y="{theme_text_y:.1f}" '
+                 f'text-anchor="middle" font-size="9" font-weight="600" '
+                 f'font-family="\'Inter\',sans-serif" fill="#808080">Light</text>')
+    lines.append('  </g>')
 
     lines.append('</g>')
 
