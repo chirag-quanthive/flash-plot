@@ -135,7 +135,8 @@ _CSS_ANIMATIONS = """
 .fp-light .fp-tip-label { fill: #555555 !important; }
 .fp-light .fp-tip-value { fill: #222222 !important; }
 .fp-light .fp-legend-text { fill: #555555 !important; }
-.fp-light .fp-bar { --fp-bar-fill: #f0f0f0; }
+.fp-light .fp-surface-dark { display: none !important; }
+.fp-light .fp-surface-light { display: block !important; }
 """
 
 
@@ -174,8 +175,10 @@ def _surface_color(z_norm: float, shade: float, base_color: str,
     return f"#{r:02x}{g:02x}{b:02x}"
 
 
-# Default dark-theme colormap — bright, visible on dark backgrounds
-DARK_COLORMAP = ["#6b3fa0", "#9b6fcc", "#c9a0f0", "#67E8F9", "#a5f3fc", "#f0abfc"]
+# Default colormaps — dark theme uses all mid-to-bright tones (no dark blues/reds)
+DARK_COLORMAP = ["#4aaaba", "#6dd5c8", "#a5f3d8", "#d8b4fe", "#f9a8d4", "#fbbf24"]
+# Light theme uses richer, deeper tones that pop on white
+LIGHT_COLORMAP = ["#1e3a5f", "#2563eb", "#7c3aed", "#c026d3", "#e11d48", "#f97316"]
 
 
 def _esc(s: str) -> str:
@@ -746,37 +749,44 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                 lines.append("</g>")
 
         elif isinstance(el, SurfacePlotElement):
-            cmap = el.colormap or DARK_COLORMAP
+            dark_cmap = el.colormap or DARK_COLORMAP
+            light_cmap = LIGHT_COLORMAP
             # Clip surface to plot area so it doesn't overflow below x-axis
             surf_clip_id = f"surfClip-{uid}"
             lines.append(f'<defs><clipPath id="{surf_clip_id}">'
                          f'<rect x="{pa.x:.1f}" y="{pa.y:.1f}" width="{pa.w:.1f}" height="{pa.h:.1f}"/>'
                          f'</clipPath></defs>')
-            lines.append(f'<g clip-path="url(#{surf_clip_id})">')
             # Sort faces back-to-front (painter's algorithm)
             sorted_faces = sorted(el.faces, key=lambda f: f.z_avg)
             total = len(sorted_faces)
+            # Pre-compute face paths and shading (shared between themes)
+            face_data = []
             for fi, face in enumerate(sorted_faces):
-                # Compute fill color
                 shade = 0.5 + 0.5 * (face.normal_z / (abs(face.normal_z) + 1e-6)) if face.normal_z != 0 else 0.5
-                fill = _surface_color(face.z_norm, shade, el.color, cmap)
-                # Build polygon path
                 pts = face.pts_2d
                 path = f"M{pts[0][0]:.1f},{pts[0][1]:.1f}"
                 for px, py in pts[1:]:
                     path += f" L{px:.1f},{py:.1f}"
                 path += " Z"
-                # Animation: stagger fade-in from back to front
                 anim_style = ""
                 if animate:
                     delay = T_DATA + (fi / max(total - 1, 1)) * 1.2
                     anim_style = f' style="animation:fp-areaFade 0.3s ease {delay:.2f}s both"'
-                # Wireframe stroke
-                stroke = ""
-                if el.wireframe:
-                    stroke = f' stroke="#2a2a2a" stroke-width="0.3" stroke-opacity="0.5"'
+                stroke_dark = ' stroke="#2a2a2a" stroke-width="0.3" stroke-opacity="0.5"' if el.wireframe else ""
+                stroke_light = ' stroke="#d0d0d0" stroke-width="0.3" stroke-opacity="0.5"' if el.wireframe else ""
+                face_data.append((face.z_norm, shade, path, anim_style, stroke_dark, stroke_light))
+            # Render dark-theme surface (visible by default)
+            lines.append(f'<g class="fp-surface-dark" clip-path="url(#{surf_clip_id})">')
+            for z_norm, shade, path, anim_style, stroke, _ in face_data:
+                fill = _surface_color(z_norm, shade, el.color, dark_cmap)
                 lines.append(f'<path d="{path}" fill="{fill}" fill-opacity="0.85"{stroke}{anim_style}/>')
-            lines.append('</g>')  # close surface clip group
+            lines.append('</g>')
+            # Render light-theme surface (hidden by default)
+            lines.append(f'<g class="fp-surface-light" clip-path="url(#{surf_clip_id})" display="none">')
+            for z_norm, shade, path, anim_style, _, stroke in face_data:
+                fill = _surface_color(z_norm, shade, el.color, light_cmap)
+                lines.append(f'<path d="{path}" fill="{fill}" fill-opacity="0.9"{stroke}{anim_style}/>')
+            lines.append('</g>')
 
     # ── Legend ────────────────────────────────────────────────────────────
     has_legend = sp.legend and sp.legend.entries
@@ -897,7 +907,7 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
     pill_w = panel_w / 2 - 18
     pill_h = 22
 
-    # Theme toggle JS: swaps SVG class, updates parent div bg, toggles pill highlight
+    # Theme toggle JS: swaps SVG class, updates parent div bg, toggles pill + surfaces
     theme_js = (
         f"(function(e){{"
         f"var s=e.currentTarget.ownerSVGElement;"
@@ -914,6 +924,11 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
         f"var pc=mode==='dark'?'#2a2a2a':'#e8e8e8';"
         f"dp.setAttribute('fill',mode==='dark'?pc:'none');"
         f"lp.setAttribute('fill',mode==='light'?pc:'none');"
+        # Swap surface groups
+        f"var sd=s.querySelectorAll('.fp-surface-dark');"
+        f"var sl=s.querySelectorAll('.fp-surface-light');"
+        f"for(var i=0;i<sd.length;i++)sd[i].setAttribute('display',mode==='dark'?'block':'none');"
+        f"for(var i=0;i<sl.length;i++)sl[i].setAttribute('display',mode==='light'?'block':'none');"
         f"}})(event)"
     )
 
