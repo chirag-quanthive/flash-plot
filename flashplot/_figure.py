@@ -193,6 +193,12 @@ class SurfacePlotElement:
     z_max: float = 1
     label: Optional[str] = None
     zorder: int = 0
+    # Raw data for interactive JS rendering
+    z_data: Optional[List[List[float]]] = None
+    x_data: Optional[List[List[float]]] = None
+    y_data: Optional[List[List[float]]] = None
+    azimuth: float = -0.6
+    elevation: float = 0.5
 
 PlotElement = Union[
     LinePlotElement, AreaPlotElement, BarPlotElement, ScatterPlotElement,
@@ -788,6 +794,8 @@ class Axes:
                     faces=faces, color=color, colormap=cmap,
                     wireframe=wireframe, z_min=z_min_s, z_max=z_max_s,
                     label=cmd.opts.get("label"), zorder=cmd.opts.get("zorder", z),
+                    z_data=cmd.z_data, x_data=cmd.x_data, y_data=cmd.y_data,
+                    azimuth=az, elevation=el_angle,
                 )
                 elements.append(sel)
                 if sel.label:

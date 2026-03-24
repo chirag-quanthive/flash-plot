@@ -4,6 +4,7 @@ Generates animated SVG with CSS keyframes for Jupyter/Colab display.
 """
 
 from __future__ import annotations
+import json
 import math
 from typing import List
 
@@ -760,7 +761,6 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
             # Sort faces back-to-front (painter's algorithm)
             sorted_faces = sorted(el.faces, key=lambda f: f.z_avg)
             total = len(sorted_faces)
-            # Pre-compute face paths and shading (shared between themes)
             face_data = []
             for fi, face in enumerate(sorted_faces):
                 shade = 0.5 + 0.5 * (face.normal_z / (abs(face.normal_z) + 1e-6)) if face.normal_z != 0 else 0.5
@@ -776,18 +776,34 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                 stroke_dark = ' stroke="#2a2a2a" stroke-width="0.3" stroke-opacity="0.5"' if el.wireframe else ""
                 stroke_light = ' stroke="#d0d0d0" stroke-width="0.3" stroke-opacity="0.5"' if el.wireframe else ""
                 face_data.append((face.z_norm, shade, path, anim_style, stroke_dark, stroke_light))
-            # Render dark-theme surface (visible by default)
+            # Static dark-theme surface (visible by default, replaced by JS when available)
             lines.append(f'<g class="fp-surface-dark" clip-path="url(#{surf_clip_id})">')
             for z_norm, shade, path, anim_style, stroke, _ in face_data:
                 fill = _surface_color(z_norm, shade, el.color, dark_cmap)
                 lines.append(f'<path d="{path}" fill="{fill}" fill-opacity="0.85"{stroke}{anim_style}/>')
             lines.append('</g>')
-            # Render light-theme surface (hidden by default)
+            # Static light-theme surface (hidden by default)
             lines.append(f'<g class="fp-surface-light" clip-path="url(#{surf_clip_id})" display="none">')
             for z_norm, shade, path, anim_style, _, stroke in face_data:
                 fill = _surface_color(z_norm, shade, el.color, light_cmap)
                 lines.append(f'<path d="{path}" fill="{fill}" fill-opacity="0.9"{stroke}{anim_style}/>')
             lines.append('</g>')
+            # JS-rendered interactive surface group (empty, populated by script)
+            lines.append(f'<g id="fp-surfjs-{uid}" clip-path="url(#{surf_clip_id})"></g>')
+            # 3D axes group (empty, populated by script)
+            lines.append(f'<g id="fp-axes3d-{uid}"></g>')
+            # Embed raw data for interactive JS
+            surf_data = {
+                "z": el.z_data, "rows": len(el.z_data), "cols": len(el.z_data[0]),
+                "az": el.azimuth, "el": el.elevation, "wf": el.wireframe,
+                "pa": {"x": round(pa.x, 1), "y": round(pa.y, 1),
+                        "w": round(pa.w, 1), "h": round(pa.h, 1)},
+                "zMn": round(el.z_min, 6), "zMx": round(el.z_max, 6),
+                "xMn": 0, "xMx": 1, "yMn": 0, "yMx": 1,
+                "dc": dark_cmap, "lc": light_cmap,
+            }
+            lines.append(f'<desc id="fp-sdata-{uid}" style="display:none">'
+                         f'{_esc(json.dumps(surf_data, separators=(",",":")))}</desc>')
 
     # ── Legend ────────────────────────────────────────────────────────────
     has_legend = sp.legend and sp.legend.entries
@@ -968,13 +984,216 @@ def render_svg(scene: Scene, animate: bool = True, hover: bool = True) -> str:
     return "\n".join(parts)
 
 
+_SURFACE_JS = r"""
+(function(){
+var svgs=document.querySelectorAll('svg');
+for(var si=0;si<svgs.length;si++){(function(S){
+  var descs=S.querySelectorAll('desc[id^="fp-sdata-"]');
+  if(!descs.length)return;
+  descs.forEach(function(desc){
+    var uid=desc.id.replace('fp-sdata-','');
+    var cfg=JSON.parse(desc.textContent);
+    var Z=cfg.z,R=cfg.rows,C=cfg.cols;
+    var az=cfg.az,el=cfg.el,wf=cfg.wf;
+    var pa=cfg.pa,zMn=cfg.zMn,zMx=cfg.zMx,zR=zMx-zMn||1;
+    var dc=cfg.dc,lc=cfg.lc;
+    var xMn=cfg.xMn,xMx=cfg.xMx,yMn=cfg.yMn,yMx=cfg.yMx;
+    var cx=pa.x+pa.w/2,cy=pa.y+pa.h/2,sc=Math.min(pa.w,pa.h)*.38;
+
+    var gJ=S.querySelector('#fp-surfjs-'+uid);
+    var gA3=S.querySelector('#fp-axes3d-'+uid);
+    var gSD=S.querySelector('.fp-surface-dark');
+    var gSL=S.querySelector('.fp-surface-light');
+    var gA2=S.querySelector('[id="fp-axis-'+uid+'"]');
+    var gG=S.querySelector('[id="fp-grid-'+uid+'"]');
+    if(!gJ)return;
+
+    // Hide static surfaces and 2D axes/grid
+    if(gSD)gSD.setAttribute('display','none');
+    if(gSL)gSL.setAttribute('display','none');
+    if(gA2)gA2.setAttribute('display','none');
+    if(gG)gG.setAttribute('display','none');
+
+    function proj(x,y,z){
+      var ca=Math.cos(az),sa=Math.sin(az),ce=Math.cos(el),se=Math.sin(el);
+      var x1=x*ca-y*sa,y1=x*sa+y*ca;
+      var y2=y1*ce-z*se,z2=y1*se+z*ce;
+      return[cx+x1*sc,cy-z2*sc,y2];
+    }
+
+    function hL(a,b,t){
+      var r1=parseInt(a.substr(1,2),16),g1=parseInt(a.substr(3,2),16),b1=parseInt(a.substr(5,2),16);
+      var r2=parseInt(b.substr(1,2),16),g2=parseInt(b.substr(3,2),16),b2=parseInt(b.substr(5,2),16);
+      var r=Math.round(r1+(r2-r1)*t),g=Math.round(g1+(g2-g1)*t),bl=Math.round(b1+(b2-b1)*t);
+      return'#'+((1<<24)|(r<<16)|(g<<8)|bl).toString(16).substr(1);
+    }
+
+    function sC(zn,sh,cm){
+      var t=Math.max(0,Math.min(1,zn)),n=cm.length-1,i=t*n,lo=Math.floor(i),hi=Math.min(lo+1,n);
+      var c=hL(cm[lo],cm[hi],i-lo);
+      var sf=.7+.3*Math.max(0,Math.min(1,sh));
+      var r=parseInt(c.substr(1,2),16),g=parseInt(c.substr(3,2),16),b=parseInt(c.substr(5,2),16);
+      return'#'+((1<<24)|(Math.min(255,Math.round(r*sf))<<16)|(Math.min(255,Math.round(g*sf))<<8)|Math.min(255,Math.round(b*sf))).toString(16).substr(1);
+    }
+
+    function render(){
+      var P=[];
+      for(var r=0;r<R;r++){P[r]=[];for(var c=0;c<C;c++){
+        var nx=2*c/Math.max(C-1,1)-1,ny=2*r/Math.max(R-1,1)-1,nz=2*(Z[r][c]-zMn)/zR-1;
+        P[r][c]=proj(nx,ny,nz);
+      }}
+      var F=[];
+      for(var r=0;r<R-1;r++)for(var c=0;c<C-1;c++){
+        var a=P[r][c],b=P[r][c+1],d=P[r+1][c],e=P[r+1][c+1];
+        var za=(a[2]+b[2]+d[2]+e[2])/4;
+        var zn=((Z[r][c]+Z[r][c+1]+Z[r+1][c]+Z[r+1][c+1])/4-zMn)/zR;
+        var bx=b[0]-a[0],by=b[1]-a[1],dx=d[0]-a[0],dy=d[1]-a[1];
+        F.push([[a,b,e,d],za,zn,bx*dy-by*dx]);
+      }
+      F.sort(function(a,b){return a[1]-b[1]});
+
+      var dk=S.getAttribute('class').indexOf('fp-dark')>=0;
+      var cm=dk?dc:lc,ws=dk?'#2a2a2a':'#d0d0d0';
+
+      var h='';
+      for(var i=0;i<F.length;i++){
+        var f=F[i],sh=f[3]?0.5+0.5*(f[3]/(Math.abs(f[3])+1e-6)):0.5;
+        var fl=sC(f[2],sh,cm);
+        var d='M'+f[0][0][0].toFixed(1)+','+f[0][0][1].toFixed(1);
+        for(var j=1;j<4;j++)d+=' L'+f[0][j][0].toFixed(1)+','+f[0][j][1].toFixed(1);
+        h+='<path d="'+d+' Z" fill="'+fl+'" fill-opacity="0.85"';
+        if(wf)h+=' stroke="'+ws+'" stroke-width="0.3" stroke-opacity="0.5"';
+        h+='/>';
+      }
+      gJ.innerHTML=h;
+      renderAxes(dk);
+    }
+
+    function renderAxes(dk){
+      var tc=dk?'#555':'#888',ac=dk?'#333':'#ccc';
+      var ff="font-size='9' font-weight='500' font-family=\"'Inter',sans-serif\"";
+      // Axis endpoints
+      var o=proj(-1,-1,-1),xE=proj(1,-1,-1),yE=proj(-1,1,-1),zE=proj(-1,-1,1);
+      // Additional box edges
+      var xyB=proj(1,1,-1),xzT=proj(1,-1,1),yzT=proj(-1,1,1),xyzT=proj(1,1,1);
+      var h='';
+      // Bottom face (ground plane)
+      h+='<line x1="'+o[0].toFixed(1)+'" y1="'+o[1].toFixed(1)+'" x2="'+xE[0].toFixed(1)+'" y2="'+xE[1].toFixed(1)+'" stroke="'+ac+'" stroke-width="0.5" stroke-opacity="0.6"/>';
+      h+='<line x1="'+o[0].toFixed(1)+'" y1="'+o[1].toFixed(1)+'" x2="'+yE[0].toFixed(1)+'" y2="'+yE[1].toFixed(1)+'" stroke="'+ac+'" stroke-width="0.5" stroke-opacity="0.6"/>';
+      h+='<line x1="'+xE[0].toFixed(1)+'" y1="'+xE[1].toFixed(1)+'" x2="'+xyB[0].toFixed(1)+'" y2="'+xyB[1].toFixed(1)+'" stroke="'+ac+'" stroke-width="0.3" stroke-opacity="0.3"/>';
+      h+='<line x1="'+yE[0].toFixed(1)+'" y1="'+yE[1].toFixed(1)+'" x2="'+xyB[0].toFixed(1)+'" y2="'+xyB[1].toFixed(1)+'" stroke="'+ac+'" stroke-width="0.3" stroke-opacity="0.3"/>';
+      // Z axis (vertical)
+      h+='<line x1="'+o[0].toFixed(1)+'" y1="'+o[1].toFixed(1)+'" x2="'+zE[0].toFixed(1)+'" y2="'+zE[1].toFixed(1)+'" stroke="'+ac+'" stroke-width="0.5" stroke-opacity="0.6"/>';
+      // Vertical edges
+      h+='<line x1="'+xE[0].toFixed(1)+'" y1="'+xE[1].toFixed(1)+'" x2="'+xzT[0].toFixed(1)+'" y2="'+xzT[1].toFixed(1)+'" stroke="'+ac+'" stroke-width="0.3" stroke-opacity="0.2"/>';
+      h+='<line x1="'+yE[0].toFixed(1)+'" y1="'+yE[1].toFixed(1)+'" x2="'+yzT[0].toFixed(1)+'" y2="'+yzT[1].toFixed(1)+'" stroke="'+ac+'" stroke-width="0.3" stroke-opacity="0.2"/>';
+
+      // X ticks (along bottom x-axis)
+      for(var i=0;i<=4;i++){
+        var t=i/4,v=-1+2*t,p=proj(v,-1,-1);
+        var lbl=(t*(xMx-xMn)+xMn).toFixed(1);
+        h+='<text x="'+p[0].toFixed(1)+'" y="'+(p[1]+14).toFixed(1)+'" text-anchor="middle" '+ff+' fill="'+tc+'">'+lbl+'</text>';
+        h+='<line x1="'+p[0].toFixed(1)+'" y1="'+p[1].toFixed(1)+'" x2="'+p[0].toFixed(1)+'" y2="'+(p[1]+3).toFixed(1)+'" stroke="'+ac+'" stroke-width="0.5"/>';
+      }
+      // Y ticks (along bottom y-axis)
+      for(var i=0;i<=4;i++){
+        var t=i/4,v=-1+2*t,p=proj(-1,v,-1);
+        var lbl=(t*(yMx-yMn)+yMn).toFixed(1);
+        h+='<text x="'+(p[0]-8).toFixed(1)+'" y="'+(p[1]+4).toFixed(1)+'" text-anchor="end" '+ff+' fill="'+tc+'">'+lbl+'</text>';
+        h+='<line x1="'+p[0].toFixed(1)+'" y1="'+p[1].toFixed(1)+'" x2="'+(p[0]-3).toFixed(1)+'" y2="'+p[1].toFixed(1)+'" stroke="'+ac+'" stroke-width="0.5"/>';
+      }
+      // Z ticks (along vertical z-axis)
+      for(var i=0;i<=4;i++){
+        var t=i/4,v=-1+2*t,p=proj(-1,-1,v);
+        var lbl=(t*zR+zMn).toFixed(1);
+        h+='<text x="'+(p[0]-8).toFixed(1)+'" y="'+(p[1]+4).toFixed(1)+'" text-anchor="end" '+ff+' fill="'+tc+'">'+lbl+'</text>';
+        h+='<line x1="'+p[0].toFixed(1)+'" y1="'+p[1].toFixed(1)+'" x2="'+(p[0]-3).toFixed(1)+'" y2="'+p[1].toFixed(1)+'" stroke="'+ac+'" stroke-width="0.5"/>';
+      }
+
+      // Ground plane grid lines (subtle)
+      for(var i=1;i<4;i++){
+        var t=i/4,v=-1+2*t;
+        var a=proj(v,-1,-1),b2=proj(v,1,-1);
+        h+='<line x1="'+a[0].toFixed(1)+'" y1="'+a[1].toFixed(1)+'" x2="'+b2[0].toFixed(1)+'" y2="'+b2[1].toFixed(1)+'" stroke="'+ac+'" stroke-width="0.3" stroke-opacity="0.2"/>';
+        var c=proj(-1,v,-1),d2=proj(1,v,-1);
+        h+='<line x1="'+c[0].toFixed(1)+'" y1="'+c[1].toFixed(1)+'" x2="'+d2[0].toFixed(1)+'" y2="'+d2[1].toFixed(1)+'" stroke="'+ac+'" stroke-width="0.3" stroke-opacity="0.2"/>';
+      }
+
+      gA3.innerHTML=h;
+    }
+
+    // Drag handling
+    var drag=false,sX,sY,sAz,sEl,vAz=0,vEl=0,aId=0;
+    var vb=S.getAttribute('viewBox').split(' ').map(Number);
+
+    function svgXY(e){
+      var r=S.getBoundingClientRect();
+      return[(e.clientX-r.left)/r.width*vb[2],(e.clientY-r.top)/r.height*vb[3]];
+    }
+    function inPA(mx,my){return mx>=pa.x&&mx<=pa.x+pa.w&&my>=pa.y&&my<=pa.y+pa.h;}
+
+    S.addEventListener('mousedown',function(e){
+      var m=svgXY(e);if(!inPA(m[0],m[1]))return;
+      drag=true;sX=e.clientX;sY=e.clientY;sAz=az;sEl=el;
+      vAz=0;vEl=0;cancelAnimationFrame(aId);
+      S.style.cursor='grabbing';e.preventDefault();
+    });
+    document.addEventListener('mousemove',function(e){
+      if(!drag)return;
+      var pAz=az,pEl=el;
+      az=sAz+(e.clientX-sX)*.005;
+      el=Math.max(-1.4,Math.min(1.4,sEl+(e.clientY-sY)*.005));
+      vAz=az-pAz;vEl=el-pEl;render();
+    });
+    document.addEventListener('mouseup',function(){
+      if(!drag)return;drag=false;S.style.cursor='grab';
+      (function m(){if(Math.abs(vAz)<.0002&&Math.abs(vEl)<.0002)return;
+        az+=vAz;el=Math.max(-1.4,Math.min(1.4,el+vEl));
+        vAz*=.92;vEl*=.92;render();aId=requestAnimationFrame(m);})();
+    });
+
+    // Touch support
+    S.addEventListener('touchstart',function(e){
+      if(e.touches.length!==1)return;var t=e.touches[0];
+      var m=svgXY(t);if(!inPA(m[0],m[1]))return;
+      drag=true;sX=t.clientX;sY=t.clientY;sAz=az;sEl=el;
+      vAz=0;vEl=0;cancelAnimationFrame(aId);e.preventDefault();
+    },{passive:false});
+    document.addEventListener('touchmove',function(e){
+      if(!drag||e.touches.length!==1)return;var t=e.touches[0];
+      var pAz=az,pEl=el;
+      az=sAz+(t.clientX-sX)*.005;
+      el=Math.max(-1.4,Math.min(1.4,sEl+(t.clientY-sY)*.005));
+      vAz=az-pAz;vEl=el-pEl;render();e.preventDefault();
+    },{passive:false});
+    document.addEventListener('touchend',function(){
+      if(!drag)return;drag=false;
+      (function m(){if(Math.abs(vAz)<.0002&&Math.abs(vEl)<.0002)return;
+        az+=vAz;el=Math.max(-1.4,Math.min(1.4,el+vEl));
+        vAz*=.92;vEl*=.92;render();aId=requestAnimationFrame(m);})();
+    });
+
+    S.style.cursor='grab';
+    render();
+  });
+})(svgs[si]);}
+})();
+"""
+
+
 def render_html(scene: Scene, animate: bool = True, hover: bool = True) -> str:
     theme = get_theme(scene.theme_name)
     svg = render_svg(scene, animate, hover=hover)
+    # Check if any subplot has surface elements
+    has_surface = any(
+        isinstance(el, SurfacePlotElement)
+        for sp in scene.subplots for el in sp.elements
+    )
+    surface_script = f"\n<script>{_SURFACE_JS}</script>" if has_surface else ""
     return f"""<div style="background:{theme.background};padding:16px;border-radius:8px;max-width:660px;">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Instrument+Serif&display=swap');
 {_CSS_ANIMATIONS}
 </style>
 {svg}
-</div>"""
+</div>{surface_script}"""
