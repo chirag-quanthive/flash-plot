@@ -12,7 +12,7 @@ from ._figure import (
     Scene, SubplotScene, PlotElement,
     LinePlotElement, AreaPlotElement, BarPlotElement, ScatterPlotElement,
     HLinePlotElement, VLinePlotElement, TextPlotElement, AnnotationPlotElement,
-    BoxPlotElement, ViolinPlotElement,
+    BoxPlotElement, ViolinPlotElement, SurfacePlotElement,
 )
 
 
@@ -119,6 +119,45 @@ _CSS_ANIMATIONS = """
 .fp-tip:hover .fp-tip-content { opacity: 1; }
 .fp-bar:hover .fp-tip-content { opacity: 1; }
 """
+
+
+def _hex_lerp(c1: str, c2: str, t: float) -> str:
+    """Linearly interpolate between two hex colors."""
+    r1, g1, b1 = int(c1[1:3], 16), int(c1[3:5], 16), int(c1[5:7], 16)
+    r2, g2, b2 = int(c2[1:3], 16), int(c2[3:5], 16), int(c2[5:7], 16)
+    r = int(r1 + (r2 - r1) * t)
+    g = int(g1 + (g2 - g1) * t)
+    b = int(b1 + (b2 - b1) * t)
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+
+def _surface_color(z_norm: float, shade: float, base_color: str,
+                   colormap: list = None) -> str:
+    """Compute face color from z-value and shading."""
+    if colormap and len(colormap) >= 2:
+        # Interpolate through colormap
+        t = max(0, min(1, z_norm))
+        n = len(colormap) - 1
+        idx = t * n
+        lo = int(idx)
+        hi = min(lo + 1, n)
+        frac = idx - lo
+        color = _hex_lerp(colormap[lo], colormap[hi], frac)
+    else:
+        # Single color with brightness variation
+        dark = _hex_lerp("#121212", base_color, 0.3 + z_norm * 0.4)
+        color = dark
+    # Apply shading
+    shade_factor = 0.7 + 0.3 * max(0, min(1, shade))
+    r, g, b = int(color[1:3], 16), int(color[3:5], 16), int(color[5:7], 16)
+    r = min(255, int(r * shade_factor))
+    g = min(255, int(g * shade_factor))
+    b = min(255, int(b * shade_factor))
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+
+# Default dark-theme colormap
+DARK_COLORMAP = ["#1a0a2e", "#3a1b6b", "#6b3fa0", "#9b6fcc", "#c9a0f0", "#67E8F9"]
 
 
 def _esc(s: str) -> str:
@@ -673,6 +712,32 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                 lines.append(f'  <circle cx="{grp.center_x:.1f}" cy="{grp.median_y:.1f}" r="1.5" '
                              f'fill="#121212"/>')
                 lines.append("</g>")
+
+        elif isinstance(el, SurfacePlotElement):
+            cmap = el.colormap or DARK_COLORMAP
+            # Sort faces back-to-front (painter's algorithm)
+            sorted_faces = sorted(el.faces, key=lambda f: f.z_avg)
+            total = len(sorted_faces)
+            for fi, face in enumerate(sorted_faces):
+                # Compute fill color
+                shade = 0.5 + 0.5 * (face.normal_z / (abs(face.normal_z) + 1e-6)) if face.normal_z != 0 else 0.5
+                fill = _surface_color(face.z_norm, shade, el.color, cmap)
+                # Build polygon path
+                pts = face.pts_2d
+                path = f"M{pts[0][0]:.1f},{pts[0][1]:.1f}"
+                for px, py in pts[1:]:
+                    path += f" L{px:.1f},{py:.1f}"
+                path += " Z"
+                # Animation: stagger fade-in from back to front
+                anim_style = ""
+                if animate:
+                    delay = T_DATA + (fi / max(total - 1, 1)) * 1.2
+                    anim_style = f' style="animation:fp-areaFade 0.3s ease {delay:.2f}s both"'
+                # Wireframe stroke
+                stroke = ""
+                if el.wireframe:
+                    stroke = f' stroke="#2a2a2a" stroke-width="0.3" stroke-opacity="0.5"'
+                lines.append(f'<path d="{path}" fill="{fill}" fill-opacity="0.85"{stroke}{anim_style}/>')
 
     # ── Hover overlay (rendered last so it's on top of all elements) ───
     if hover:

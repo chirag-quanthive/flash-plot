@@ -521,3 +521,120 @@ def compute_violin_kde(
         min_val=lo, max_val=hi,
         q1=q1, median=med, q3=q3,
     )
+
+
+# ── 3D Surface Plot ──────────────────────────────────────────────────
+
+@dataclass
+class SurfaceFace:
+    """One quad face of a 3D surface, projected to 2D."""
+    pts_2d: List[Tuple[float, float]]  # 4 corners in screen coords
+    z_avg: float   # average depth for painter's sort
+    z_norm: float  # normalized z value 0..1 for coloring
+    normal_z: float  # surface normal z-component for shading
+
+
+def project_point(
+    x: float, y: float, z: float,
+    az: float, el: float,
+    cx: float, cy: float, scale: float,
+) -> Tuple[float, float, float]:
+    """Project a 3D point to 2D using rotation + orthographic projection.
+    Returns (screen_x, screen_y, depth)."""
+    # Rotate around Z axis (azimuth)
+    cos_a, sin_a = math.cos(az), math.sin(az)
+    x1 = x * cos_a - y * sin_a
+    y1 = x * sin_a + y * cos_a
+    z1 = z
+    # Rotate around X axis (elevation)
+    cos_e, sin_e = math.cos(el), math.sin(el)
+    y2 = y1 * cos_e - z1 * sin_e
+    z2 = y1 * sin_e + z1 * cos_e
+    # Orthographic projection
+    sx = cx + x1 * scale
+    sy = cy - z2 * scale
+    depth = y2
+    return sx, sy, depth
+
+
+def build_surface_faces(
+    z_data: List[List[float]],
+    x_data: Optional[List[List[float]]],
+    y_data: Optional[List[List[float]]],
+    plot_area: Rect,
+    azimuth: float = -0.6,
+    elevation: float = 0.5,
+) -> Tuple[List[SurfaceFace], float, float]:
+    """Build projected surface faces from a 2D z-grid.
+    Returns (faces, z_min, z_max)."""
+    rows = len(z_data)
+    cols = len(z_data[0]) if rows > 0 else 0
+
+    # Build coordinate grids
+    if x_data is None:
+        x_data = [[c / max(cols - 1, 1) for c in range(cols)] for _ in range(rows)]
+    if y_data is None:
+        y_data = [[r / max(rows - 1, 1) for _ in range(cols)] for r in range(rows)]
+
+    # Find data ranges
+    z_min = min(z_data[r][c] for r in range(rows) for c in range(cols))
+    z_max = max(z_data[r][c] for r in range(rows) for c in range(cols))
+    x_min = min(x_data[r][c] for r in range(rows) for c in range(cols))
+    x_max = max(x_data[r][c] for r in range(rows) for c in range(cols))
+    y_min = min(y_data[r][c] for r in range(rows) for c in range(cols))
+    y_max = max(y_data[r][c] for r in range(rows) for c in range(cols))
+    z_range = z_max - z_min or 1
+    x_range = x_max - x_min or 1
+    y_range = y_max - y_min or 1
+
+    # Normalize to [-1, 1] cube
+    def norm(r: int, c: int) -> Tuple[float, float, float]:
+        nx = 2 * (x_data[r][c] - x_min) / x_range - 1
+        ny = 2 * (y_data[r][c] - y_min) / y_range - 1
+        nz = 2 * (z_data[r][c] - z_min) / z_range - 1
+        return nx, ny, nz
+
+    # Project all points
+    cx = plot_area.x + plot_area.w / 2
+    cy = plot_area.y + plot_area.h / 2
+    scale = min(plot_area.w, plot_area.h) * 0.38
+
+    projected: List[List[Tuple[float, float, float]]] = []
+    for r in range(rows):
+        row = []
+        for c in range(cols):
+            nx, ny, nz = norm(r, c)
+            row.append(project_point(nx, ny, nz, azimuth, elevation, cx, cy, scale))
+        projected.append(row)
+
+    # Build quad faces
+    faces: List[SurfaceFace] = []
+    for r in range(rows - 1):
+        for c in range(cols - 1):
+            p00 = projected[r][c]
+            p01 = projected[r][c + 1]
+            p10 = projected[r + 1][c]
+            p11 = projected[r + 1][c + 1]
+
+            pts_2d = [(p00[0], p00[1]), (p01[0], p01[1]),
+                      (p11[0], p11[1]), (p10[0], p10[1])]
+            z_avg = (p00[2] + p01[2] + p10[2] + p11[2]) / 4
+
+            # Average normalized z for color
+            z_vals = [z_data[r][c], z_data[r][c + 1],
+                      z_data[r + 1][c], z_data[r + 1][c + 1]]
+            z_norm = (sum(z_vals) / 4 - z_min) / z_range
+
+            # Surface normal z-component for shading
+            ax_ = p01[0] - p00[0]
+            ay_ = p01[1] - p00[1]
+            bx_ = p10[0] - p00[0]
+            by_ = p10[1] - p00[1]
+            normal_z = ax_ * by_ - ay_ * bx_
+
+            faces.append(SurfaceFace(
+                pts_2d=pts_2d, z_avg=z_avg,
+                z_norm=z_norm, normal_z=normal_z,
+            ))
+
+    return faces, z_min, z_max

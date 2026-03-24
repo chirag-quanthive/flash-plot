@@ -9,13 +9,13 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 from ._core import (
     Point, Rect, TickMark, TextStyle, Theme, BarGeometry, BarThemeStyle,
-    BoxStats, ViolinStats,
+    BoxStats, ViolinStats, SurfaceFace,
     get_theme,
     compute_ticks, generate_tick_marks, scale_value,
     compute_layout, compute_subplot_bounds,
     build_line_path, build_area_path, build_fill_between_path,
     build_bar_rects, build_scatter_points, compute_histogram_bins,
-    compute_box_stats, compute_violin_kde,
+    compute_box_stats, compute_violin_kde, build_surface_faces,
     DEFAULT_WIDTH, DEFAULT_HEIGHT,
 )
 
@@ -182,10 +182,22 @@ class ViolinPlotElement:
     x_labels: List[str] = field(default_factory=list)
     zorder: int = 0
 
+@dataclass
+class SurfacePlotElement:
+    kind: str = "surface"
+    faces: List[SurfaceFace] = field(default_factory=list)
+    color: str = "#C084FC"
+    colormap: Optional[List[str]] = None
+    wireframe: bool = True
+    z_min: float = 0
+    z_max: float = 1
+    label: Optional[str] = None
+    zorder: int = 0
+
 PlotElement = Union[
     LinePlotElement, AreaPlotElement, BarPlotElement, ScatterPlotElement,
     HLinePlotElement, VLinePlotElement, TextPlotElement, AnnotationPlotElement,
-    BoxPlotElement, ViolinPlotElement,
+    BoxPlotElement, ViolinPlotElement, SurfacePlotElement,
 ]
 
 @dataclass
@@ -275,6 +287,14 @@ class _AnnotateCmd:
     opts: Dict[str, Any] = field(default_factory=dict)
 
 @dataclass
+class _SurfaceCmd:
+    kind: str = "surface"
+    z_data: List[List[float]] = field(default_factory=list)
+    x_data: Optional[List[List[float]]] = None
+    y_data: Optional[List[List[float]]] = None
+    opts: Dict[str, Any] = field(default_factory=dict)
+
+@dataclass
 class _BoxPlotCmd:
     kind: str = "boxplot"
     datasets: List[List[float]] = field(default_factory=list)
@@ -346,6 +366,17 @@ class Axes:
 
     def hist(self, data, **kwargs) -> "Axes":
         self._commands.append(_HistCmd(data=list(data), opts=kwargs))
+        return self
+
+    def surface(self, z_data, x_data=None, y_data=None, **kwargs) -> "Axes":
+        """surface(Z, X=None, Y=None, color=..., colormap=..., wireframe=True, azimuth=..., elevation=...)
+        Z is a 2D list (rows x cols). X, Y are optional 2D grids of same shape."""
+        zd = [list(row) for row in z_data]
+        xd = [list(row) for row in x_data] if x_data is not None else None
+        yd = [list(row) for row in y_data] if y_data is not None else None
+        if "color" not in kwargs and "colormap" not in kwargs:
+            kwargs["color"] = "#C084FC"
+        self._commands.append(_SurfaceCmd(z_data=zd, x_data=xd, y_data=yd, opts=kwargs))
         return self
 
     def boxplot(self, datasets, **kwargs) -> "Axes":
@@ -492,6 +523,12 @@ class Axes:
                 y_lo = min(y_lo, 0)
                 y_hi = max(y_hi, max(counts) * 1.1)
 
+            elif isinstance(cmd, _SurfaceCmd):
+                # Surface plots use their own projection; set default bounds if needed
+                if x_lo == float("inf"):
+                    x_lo, x_hi = 0, 1
+                if y_lo == float("inf"):
+                    y_lo, y_hi = 0, 1
             elif isinstance(cmd, _BoxPlotCmd):
                 for ds in cmd.datasets:
                     for v in ds:
@@ -737,6 +774,24 @@ class Axes:
                     color=cmd.opts.get("color", self._theme.text_primary),
                 ), arrow_color=cmd.opts.get("arrowprops", {}).get("color"), arrow_width=cmd.opts.get("arrowprops", {}).get("lw"), zorder=cmd.opts.get("zorder", z))
                 elements.append(el)
+
+            elif isinstance(cmd, _SurfaceCmd):
+                color = cmd.opts.get("color", "#C084FC")
+                cmap = cmd.opts.get("colormap")
+                wireframe = cmd.opts.get("wireframe", True)
+                az = cmd.opts.get("azimuth", -0.6)
+                el_angle = cmd.opts.get("elevation", 0.5)
+                faces, z_min_s, z_max_s = build_surface_faces(
+                    cmd.z_data, cmd.x_data, cmd.y_data, pa, az, el_angle,
+                )
+                sel = SurfacePlotElement(
+                    faces=faces, color=color, colormap=cmap,
+                    wireframe=wireframe, z_min=z_min_s, z_max=z_max_s,
+                    label=cmd.opts.get("label"), zorder=cmd.opts.get("zorder", z),
+                )
+                elements.append(sel)
+                if sel.label:
+                    legend_entries.append(LegendEntry(sel.label, color, "area"))
 
             elif isinstance(cmd, _BoxPlotCmd):
                 color = cmd.opts.get("color", self._theme.default_colors[0])
