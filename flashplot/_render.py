@@ -415,6 +415,7 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                      f'fill="{sp.subtitle_style.color}"{anim_style}>{_esc(sp.subtitle)}</text>')
 
     # ── Grid ────────────────────────────────────────────────────────────
+    lines.append(f'<g id="fp-grid-{uid}">')
     for i, gl in enumerate(sp.grid.lines):
         ln = math.sqrt((gl.x2 - gl.x1) ** 2 + (gl.y2 - gl.y1) ** 2)
         anim = ""
@@ -423,8 +424,13 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                     f'animation:fp-gridDraw 0.675s cubic-bezier(0.22,1,0.36,1) {i*0.08:.2f}s both"')
         lines.append(f'<line x1="{gl.x1:.1f}" y1="{gl.y1:.1f}" x2="{gl.x2:.1f}" y2="{gl.y2:.1f}" '
                      f'stroke="{gl.color}" stroke-width="{gl.width}"{anim}/>')
+    lines.append('</g>')
+
+    # ── Axis labels (wrapped in parent group for toggle) ─────────────
+    lines.append(f'<g id="fp-axis-{uid}">')
 
     # ── Y labels (with shimmer) ────────────────────────────────────────
+    lines.append(f'<g id="fp-ylbl-{uid}">')
     for i, t in enumerate(sp.y_axis.ticks):
         ts = sp.y_axis.tick_style
         anim_style = ""
@@ -437,8 +443,10 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                      f'font-size="{ts.font_size}" font-weight="{ts.font_weight}" '
                      f'font-family="{_esc(ts.font_family)}" letter-spacing="{ts.letter_spacing}" '
                      f'fill="{ts.color}" style="{anim_style}">{_esc(t.label)}</text>')
+    lines.append('</g>')
 
     # ── X labels (with shimmer) ────────────────────────────────────────
+    lines.append(f'<g id="fp-xlbl-{uid}">')
     for i, t in enumerate(sp.x_axis.ticks):
         ts = sp.x_axis.tick_style
         anim_style = ""
@@ -451,6 +459,8 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                      f'font-size="{ts.font_size}" font-weight="{ts.font_weight}" '
                      f'font-family="{_esc(ts.font_family)}" letter-spacing="{ts.letter_spacing}" '
                      f'fill="{ts.color}" style="{anim_style}">{_esc(t.label)}</text>')
+    lines.append('</g>')  # close x labels
+    lines.append('</g>')  # close axis labels parent group
 
     # ── Plot elements ───────────────────────────────────────────────────
     line_idx = 0
@@ -746,6 +756,29 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                 lines.append(f'<path d="{path}" fill="{fill}" fill-opacity="0.85"{stroke}{anim_style}/>')
             lines.append('</g>')  # close surface clip group
 
+    # ── Legend ────────────────────────────────────────────────────────────
+    has_legend = sp.legend and sp.legend.entries
+    if has_legend:
+        lines.append(f'<g id="fp-legend-{uid}">')
+        leg_x = pa.x + pa.w - 8
+        leg_y = pa.y + 8
+        row_h = 16
+        for li, le in enumerate(sp.legend.entries):
+            ly = leg_y + li * row_h
+            if le.kind == "bar" and le.bar_gradient:
+                lines.append(f'  <rect x="{leg_x - 80:.1f}" y="{ly:.1f}" width="10" height="10" rx="2" '
+                             f'fill="{le.color}"/>')
+            elif le.kind == "scatter":
+                lines.append(f'  <circle cx="{leg_x - 75:.1f}" cy="{ly + 5:.1f}" r="3.5" fill="{le.color}"/>')
+            else:
+                da = dash_array(le.line_style) if le.line_style else None
+                extra = f' stroke-dasharray="{da}"' if da else ""
+                lines.append(f'  <line x1="{leg_x - 82:.1f}" y1="{ly + 5:.1f}" x2="{leg_x - 68:.1f}" y2="{ly + 5:.1f}" '
+                             f'stroke="{le.color}" stroke-width="{le.line_width or 1.5}"{extra}/>')
+            lines.append(f'  <text x="{leg_x - 62:.1f}" y="{ly + 9:.1f}" font-size="9" font-weight="500" '
+                         f'font-family="\'Inter\',sans-serif" fill="#808080">{_esc(le.label)}</text>')
+        lines.append('</g>')
+
     # ── Hover overlay (rendered last so it's on top of all elements) ───
     if hover:
         # Bar tooltips in a named container, triggered via CSS sibling selectors
@@ -769,6 +802,66 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
         style_parts.append("</style>")
         lines[style_insert_idx] = "\n".join(style_parts)
 
+
+    # ── Settings dropdown button (rendered last, on top of everything) ──
+    btn_x = w - 28
+    btn_y = 14
+    panel_w = 148
+    panel_h = 104
+    panel_x = w - panel_w - 8
+    panel_y = btn_y + 22
+
+    # Chevron button
+    lines.append(f'<g id="fp-cfg-btn-{uid}" cursor="pointer" '
+                 f'onclick="(function(e){{var s=e.currentTarget.ownerSVGElement;'
+                 f'var p=s.getElementById(\'fp-cfg-panel-{uid}\');'
+                 f'var v=p.getAttribute(\'display\')===\'none\';'
+                 f'p.setAttribute(\'display\',v?\'block\':\'none\');'
+                 f'}})(event)">')
+    lines.append(f'  <rect x="{btn_x - 4:.1f}" y="{btn_y - 4:.1f}" width="20" height="20" rx="4" '
+                 f'fill="transparent"/>')
+    lines.append(f'  <path d="M{btn_x:.1f} {btn_y + 3:.1f} l5 5 l5 -5" fill="none" '
+                 f'stroke="#606060" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>')
+    lines.append('</g>')
+
+    # Settings panel (hidden by default)
+    lines.append(f'<g id="fp-cfg-panel-{uid}" display="none">')
+    lines.append(f'  <rect x="{panel_x:.1f}" y="{panel_y:.1f}" width="{panel_w}" height="{panel_h}" '
+                 f'rx="6" fill="#1a1a1a" stroke="#2a2a2a" stroke-width="0.5"/>')
+
+    toggle_items = [
+        ("Grid Lines", f"fp-grid-{uid}", True),
+        ("Axis Labels", f"fp-axis-{uid}", True),
+        ("Legend", f"fp-legend-{uid}", bool(has_legend)),
+    ]
+
+    for ti, (label, target_id, enabled) in enumerate(toggle_items):
+        ry = panel_y + 12 + ti * 30
+        check_x = panel_x + 12
+        check_y = ry
+        text_x = panel_x + 34
+        text_y = ry + 10
+
+        lines.append(f'  <g id="fp-tog-{uid}-{ti}" cursor="pointer" '
+                     f'onclick="(function(e){{var s=e.currentTarget.ownerSVGElement;'
+                     f'var t=s.getElementById(\'{target_id}\');'
+                     f'if(!t)return;'
+                     f'var vis=t.getAttribute(\'display\')!==\'none\';'
+                     f't.setAttribute(\'display\',vis?\'none\':\'block\');'
+                     f'var ck=e.currentTarget.querySelector(\'.fp-ck\');'
+                     f'ck.setAttribute(\'opacity\',vis?\'0\':\'1\');'
+                     f'}})(event)">')
+        lines.append(f'    <rect x="{check_x:.1f}" y="{check_y:.1f}" width="14" height="14" rx="3" '
+                     f'fill="none" stroke="#494949" stroke-width="0.8"/>')
+        opacity = "1" if enabled else "0"
+        lines.append(f'    <path class="fp-ck" d="M{check_x + 3:.1f} {check_y + 7:.1f} l3 3 l5 -6" '
+                     f'fill="none" stroke="#808080" stroke-width="1.3" stroke-linecap="round" '
+                     f'stroke-linejoin="round" opacity="{opacity}"/>')
+        lines.append(f'    <text x="{text_x:.1f}" y="{text_y:.1f}" font-size="10" font-weight="500" '
+                     f'font-family="\'Inter\',sans-serif" fill="#808080">{label}</text>')
+        lines.append('  </g>')
+
+    lines.append('</g>')
 
     lines.append("</svg>")
     return "\n".join(lines)
