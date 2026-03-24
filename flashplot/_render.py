@@ -715,6 +715,12 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
 
         elif isinstance(el, SurfacePlotElement):
             cmap = el.colormap or DARK_COLORMAP
+            # Clip surface to plot area so it doesn't overflow below x-axis
+            surf_clip_id = f"surfClip-{uid}"
+            lines.append(f'<defs><clipPath id="{surf_clip_id}">'
+                         f'<rect x="{pa.x:.1f}" y="{pa.y:.1f}" width="{pa.w:.1f}" height="{pa.h:.1f}"/>'
+                         f'</clipPath></defs>')
+            lines.append(f'<g clip-path="url(#{surf_clip_id})">')
             # Sort faces back-to-front (painter's algorithm)
             sorted_faces = sorted(el.faces, key=lambda f: f.z_avg)
             total = len(sorted_faces)
@@ -738,6 +744,7 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                 if el.wireframe:
                     stroke = f' stroke="#2a2a2a" stroke-width="0.3" stroke-opacity="0.5"'
                 lines.append(f'<path d="{path}" fill="{fill}" fill-opacity="0.85"{stroke}{anim_style}/>')
+            lines.append('</g>')  # close surface clip group
 
     # ── Hover overlay (rendered last so it's on top of all elements) ───
     if hover:
