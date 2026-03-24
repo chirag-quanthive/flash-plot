@@ -751,10 +751,11 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
         elif isinstance(el, SurfacePlotElement):
             dark_cmap = el.colormap or DARK_COLORMAP
             light_cmap = LIGHT_COLORMAP
-            # Clip surface to plot area so it doesn't overflow below x-axis
+            # Clip surface — extend bottom by 10px so projection isn't cut at x-axis
             surf_clip_id = f"surfClip-{uid}"
+            clip_pad = 10
             lines.append(f'<defs><clipPath id="{surf_clip_id}">'
-                         f'<rect x="{pa.x:.1f}" y="{pa.y:.1f}" width="{pa.w:.1f}" height="{pa.h:.1f}"/>'
+                         f'<rect x="{pa.x:.1f}" y="{pa.y:.1f}" width="{pa.w:.1f}" height="{pa.h + clip_pad:.1f}"/>'
                          f'</clipPath></defs>')
             # Sort faces back-to-front (painter's algorithm)
             sorted_faces = sorted(el.faces, key=lambda f: f.z_avg)
