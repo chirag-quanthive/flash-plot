@@ -384,12 +384,15 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
     bar_sweep_start = T_DATA + 0.81 + bar_count * 0.054
     bar_sweep_step = 0.12
 
-    lines.append(f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w:.1f} {h:.1f}" '
+    # Add extra height for legend below x-axis
+    legend_extra_h = 30 if (sp.legend and sp.legend.entries) else 0
+    svg_h = h + legend_extra_h
+    lines.append(f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w:.1f} {svg_h:.1f}" '
                  f'class="fp-dark" '
                  f'style="width:100%;height:auto;display:block;font-family:\'Inter\',sans-serif;">')
 
     # Background rect (themed)
-    lines.append(f'<rect class="fp-bg" width="{w:.1f}" height="{h:.1f}" fill="{theme.background}" rx="4"/>')
+    lines.append(f'<rect class="fp-bg" width="{w:.1f}" height="{svg_h:.1f}" fill="{theme.background}" rx="4"/>')
 
     # Inline styles placeholder — will be finalized after collecting bar tip CSS rules
     style_insert_idx = len(lines)
@@ -839,7 +842,7 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
         gap = 16
         total_leg_w = sum(item_widths) + gap * (len(item_widths) - 1)
         leg_start_x = pa.x + (pa.w - total_leg_w) / 2
-        leg_y = pa.y + pa.h + 28  # below x-axis labels
+        leg_y = pa.y + pa.h + 44  # well below x-axis labels
         cur_x = leg_start_x
         for li, le in enumerate(sp.legend.entries):
             if le.kind == "bar" and le.bar_gradient:
