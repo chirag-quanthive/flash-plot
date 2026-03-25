@@ -136,7 +136,8 @@ _CSS_ANIMATIONS = """
 .fp-light .fp-tip-label { fill: #555555 !important; }
 .fp-light .fp-tip-value { fill: #222222 !important; }
 .fp-light .fp-legend-text { fill: #555555 !important; }
-/* Light mode bars: soften dark glow/highlight effects to subtle light grey */
+/* Light mode bars: light grey background bar, soften glow effects */
+.fp-light .fp-bar-bg { fill: #e0e0e0 !important; }
 .fp-light .fp-drift { opacity: 0.12 !important; }
 .fp-light .fp-bar-base-glow .fp-drift { opacity: 0.12 !important; }
 .fp-light .fp-surface-dark { display: none !important; }
@@ -561,7 +562,7 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
 
                 bar_id = f"fp-b-{uid}-{bar_el_idx}-{bar.index}"
                 lines.append(f'<g id="{bar_id}" class="fp-bar">')
-                lines.append(f'  <rect x="{bar.x:.1f}" y="{bar.y:.1f}" width="{bar.width:.1f}" height="{bar.height:.1f}" '
+                lines.append(f'  <rect class="fp-bar-bg" x="{bar.x:.1f}" y="{bar.y:.1f}" width="{bar.width:.1f}" height="{bar.height:.1f}" '
                              f'fill="{theme.bar_default_fill}" style="{grow_style}"/>')
 
                 clip_id = f"bc-{uid}-{bar_el_idx}-{bar.index}"
