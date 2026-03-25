@@ -136,6 +136,9 @@ _CSS_ANIMATIONS = """
 .fp-light .fp-tip-label { fill: #555555 !important; }
 .fp-light .fp-tip-value { fill: #222222 !important; }
 .fp-light .fp-legend-text { fill: #555555 !important; }
+/* Light mode bars: soften dark glow effects to subtle light grey */
+.fp-light .fp-drift { opacity: 0.15 !important; }
+.fp-light .fp-bar-base-glow .fp-drift { opacity: 0.15 !important; }
 .fp-light .fp-surface-dark { display: none !important; }
 .fp-light .fp-surface-light { display: block !important; }
 /* When 3D mode is active, hide both static surfaces regardless of theme */

@@ -657,7 +657,7 @@ class Axes:
 
             elif isinstance(cmd, _BarCmd):
                 is_stacked = cmd.opts.get("bottom") is not None
-                si = 0 if is_stacked else bar_si
+                si = bar_si
                 ns = max(bar_series_count, 1)
                 bw = cmd.opts.get("width", 20)
                 color = cmd.opts.get("color", self._theme.bar_styles[si % len(self._theme.bar_styles)].fill)
@@ -670,8 +670,7 @@ class Axes:
                 if el.label:
                     st = self._theme.bar_styles[si % len(self._theme.bar_styles)]
                     legend_entries.append(LegendEntry(el.label, color, "bar", bar_gradient=(st.grad_top, st.grad_bottom)))
-                if not is_stacked:
-                    bar_si += 1
+                bar_si += 1
 
             elif isinstance(cmd, _ScatterCmd):
                 color = cmd.opts.get("color", self._theme.default_colors[0])
