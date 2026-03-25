@@ -657,18 +657,19 @@ class Axes:
 
             elif isinstance(cmd, _BarCmd):
                 is_stacked = cmd.opts.get("bottom") is not None
-                si = bar_si
-                ns = max(bar_series_count, 1)
+                style_si = bar_si  # style index: distinct color per series
+                pos_si = 0 if is_stacked else bar_si  # position index: stacked bars share x
+                pos_ns = 1 if is_stacked else max(bar_series_count, 1)
                 bw = cmd.opts.get("width", 20)
-                color = cmd.opts.get("color", self._theme.bar_styles[si % len(self._theme.bar_styles)].fill)
+                color = cmd.opts.get("color", self._theme.bar_styles[style_si % len(self._theme.bar_styles)].fill)
                 if isinstance(color, list):
                     color = color[0]
-                bars = build_bar_rects(cmd.y_data, si, ns, pa, y_lo, y_hi, bw, 3, cmd.opts.get("bottom"))
+                bars = build_bar_rects(cmd.y_data, pos_si, pos_ns, pa, y_lo, y_hi, bw, 3, cmd.opts.get("bottom"))
                 xlbls = [str(x) for x in cmd.x_data] if cmd.x_data else [str(i) for i in range(len(cmd.y_data))]
-                el = BarPlotElement(bars=bars, series_index=si, color=color, label=cmd.opts.get("label"), zorder=cmd.opts.get("zorder", z), x_labels=xlbls, is_base=not is_stacked)
+                el = BarPlotElement(bars=bars, series_index=style_si, color=color, label=cmd.opts.get("label"), zorder=cmd.opts.get("zorder", z), x_labels=xlbls, is_base=not is_stacked)
                 elements.append(el)
                 if el.label:
-                    st = self._theme.bar_styles[si % len(self._theme.bar_styles)]
+                    st = self._theme.bar_styles[style_si % len(self._theme.bar_styles)]
                     legend_entries.append(LegendEntry(el.label, color, "bar", bar_gradient=(st.grad_top, st.grad_bottom)))
                 bar_si += 1
 

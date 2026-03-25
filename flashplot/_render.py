@@ -136,7 +136,8 @@ _CSS_ANIMATIONS = """
 .fp-light .fp-tip-label { fill: #555555 !important; }
 .fp-light .fp-tip-value { fill: #222222 !important; }
 .fp-light .fp-legend-text { fill: #555555 !important; }
-/* Light mode bars: soften dark glow effects to subtle light grey */
+/* Light mode bars: light grey base fill, soften dark glow effects */
+.fp-light .fp-bar-fill { fill: #e8e8e8 !important; }
 .fp-light .fp-drift { opacity: 0.15 !important; }
 .fp-light .fp-bar-base-glow .fp-drift { opacity: 0.15 !important; }
 .fp-light .fp-surface-dark { display: none !important; }
@@ -592,7 +593,7 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                     # Stacked bars: hidden by default, show only on hover
                     lines.append(f'  <g class="fp-bar-glow" clip-path="url(#{clip_id})">')
 
-                lines.append(f'    <rect x="{bar.x:.1f}" y="{bar.y:.1f}" width="{bar.width:.1f}" height="{bar.height:.1f}" fill="{st.fill}" style="{grow_style}"/>')
+                lines.append(f'    <rect class="fp-bar-fill" x="{bar.x:.1f}" y="{bar.y:.1f}" width="{bar.width:.1f}" height="{bar.height:.1f}" fill="{st.fill}" style="{grow_style}"/>')
 
                 sc = lambda hv: (hv / 134) * bar.height
                 bx, bw = bar.x, bar.width
@@ -929,6 +930,18 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
         text_x = panel_x + 34
         text_y = ry + 10
 
+        # Legend toggle also adjusts SVG viewBox height
+        is_legend_toggle = target_id == f"fp-legend-{uid}"
+        legend_vb_js = ""
+        if is_legend_toggle:
+            legend_vb_js = (
+                f"var vb=s.getAttribute('viewBox').split(' ').map(Number);"
+                f"vb[3]=vis?vb[3]-{legend_extra_h}:vb[3]+{legend_extra_h};"
+                f"s.setAttribute('viewBox',vb.join(' '));"
+                f"var bg=s.querySelector('.fp-bg');"
+                f"if(bg)bg.setAttribute('height',vb[3]);"
+            )
+
         lines.append(f'  <g id="fp-tog-{uid}-{ti}" cursor="pointer" '
                      f'onclick="(function(e){{var s=e.currentTarget.ownerSVGElement;'
                      f'var t=s.getElementById(\'{target_id}\');'
@@ -937,6 +950,7 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                      f't.setAttribute(\'display\',vis?\'none\':\'block\');'
                      f'var ck=e.currentTarget.querySelector(\'.fp-ck\');'
                      f'ck.setAttribute(\'opacity\',vis?\'0\':\'1\');'
+                     f'{legend_vb_js}'
                      f'}})(event)">')
         lines.append(f'    <rect class="fp-panel-check-box" x="{check_x:.1f}" y="{check_y:.1f}" width="14" height="14" rx="3" '
                      f'fill="none" stroke="#494949" stroke-width="0.8"/>')
