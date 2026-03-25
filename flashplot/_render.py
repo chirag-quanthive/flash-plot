@@ -138,6 +138,9 @@ _CSS_ANIMATIONS = """
 .fp-light .fp-legend-text { fill: #555555 !important; }
 .fp-light .fp-surface-dark { display: none !important; }
 .fp-light .fp-surface-light { display: block !important; }
+/* When 3D mode is active, hide both static surfaces regardless of theme */
+.fp-3d-active .fp-surface-dark { display: none !important; }
+.fp-3d-active .fp-surface-light { display: none !important; }
 """
 
 
@@ -1175,8 +1178,7 @@ for(var si=0;si<svgs.length;si++){(function(S){
     // Toggle between 2D static and 3D interactive
     function enter3D(){
       is3D=true;
-      if(gSD)gSD.setAttribute('display','none');
-      if(gSL)gSL.setAttribute('display','none');
+      S.classList.add('fp-3d-active');
       if(gA2)gA2.setAttribute('display','none');
       if(gG)gG.setAttribute('display','none');
       gJ.setAttribute('display','block');
@@ -1188,12 +1190,10 @@ for(var si=0;si<svgs.length;si++){(function(S){
     function exit3D(){
       is3D=false;
       cancelAnimationFrame(aId);
+      S.classList.remove('fp-3d-active');
       gJ.innerHTML='';gJ.setAttribute('display','none');
       gA3.innerHTML='';gA3.setAttribute('display','none');
       // Restore static view
-      var dk=S.getAttribute('class').indexOf('fp-dark')>=0;
-      if(gSD)gSD.setAttribute('display',dk?'block':'none');
-      if(gSL)gSL.setAttribute('display',dk?'none':'block');
       if(gA2)gA2.setAttribute('display','block');
       if(gG)gG.setAttribute('display','block');
       if(btnLbl)btnLbl.textContent='3D';
