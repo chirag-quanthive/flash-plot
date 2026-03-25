@@ -908,12 +908,15 @@ class Axes:
                 total = sum(cmd.values) or 1
                 donut = cmd.opts.get("donut", False)
                 donut_ratio = cmd.opts.get("donut_ratio", 0.55)
+                # Default to surface-plot colormap for visual consistency
+                _pie_palette = ["#4aaaba", "#6dd5c8", "#a5f3d8", "#d8b4fe", "#f9a8d4", "#fbbf24",
+                                "#4ECDC4", "#FF6B6B", "#C084FC", "#67E8F9"]
                 pie_colors = cmd.colors or [
-                    self._theme.default_colors[i % len(self._theme.default_colors)]
+                    _pie_palette[i % len(_pie_palette)]
                     for i in range(len(cmd.values))
                 ]
-                # Center pie in plot area
-                pie_r = min(pa.w, pa.h) * 0.42
+                # Center pie in plot area, use height to keep it proportional
+                pie_r = min(pa.w, pa.h) * 0.36
                 pie_cx = pa.x + pa.w / 2
                 pie_cy = pa.y + pa.h / 2
                 gap = 0.02  # radians gap between slices

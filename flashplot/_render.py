@@ -114,6 +114,18 @@ _CSS_ANIMATIONS = """
 .fp-bar .fp-sparkle { animation: none !important; }
 .fp-bar:hover .fp-sparkle { animation: var(--fp-sparkle-anim) !important; }
 
+/* ── Pie chart interactions ─────────────────────────────────────────── */
+@keyframes fp-pieSliceIn {
+  from { opacity: 0; transform: scale(0.85); }
+  to { opacity: 1; transform: scale(1); }
+}
+.fp-pie-slice { cursor: pointer; transition: opacity 0.25s ease, transform 0.2s ease; transform-origin: var(--fp-pie-cx) var(--fp-pie-cy); }
+.fp-pie-group:hover .fp-pie-slice { opacity: 0.35; }
+.fp-pie-group:hover .fp-pie-slice:hover { opacity: 1; transform: scale(1.03); }
+.fp-pie-group:hover .fp-pie-slice:hover + .fp-pie-lbl { opacity: 1; }
+.fp-pie-lbl { transition: opacity 0.25s ease; pointer-events: none; }
+.fp-pie-group:hover .fp-pie-lbl { opacity: 0.35; }
+
 /* ── Hover tooltips ─────────────────────────────────────────────────── */
 .fp-tip { pointer-events: all; }
 .fp-tip-content { opacity: 0; pointer-events: none; transition: opacity 0.12s ease; }
@@ -846,31 +858,34 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
             pcx, pcy, pr = el.cx, el.cy, el.radius
             inner_r = pr * el.donut_ratio if el.donut else 0
 
-            # Radial gradients + drop shadow
+            # Radial gradients + subtle drop shadow
             lines.append('<defs>')
             for si, s in enumerate(el.slices):
                 lines.append(f'<radialGradient id="fpPieGrad-{uid}-{si}" cx="50%" cy="50%" r="50%">'
-                             f'<stop offset="0%" stop-color="{s.color}" stop-opacity="0.9"/>'
+                             f'<stop offset="0%" stop-color="{s.color}" stop-opacity="0.85"/>'
                              f'<stop offset="100%" stop-color="{s.color}" stop-opacity="1"/>'
                              f'</radialGradient>')
             lines.append(f'<filter id="fpPieShadow-{uid}" x="-20%" y="-20%" width="140%" height="140%">'
-                         f'<feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="#000" flood-opacity="0.4"/>'
+                         f'<feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#000" flood-opacity="0.25"/>'
                          f'</filter>')
             lines.append('</defs>')
 
-            lines.append(f'<g filter="url(#fpPieShadow-{uid})">')
+            # Pie group with hover dimming via CSS
+            pie_cx_css = f"{pcx:.1f}px"
+            pie_cy_css = f"{pcy:.1f}px"
+            lines.append(f'<g class="fp-pie-group" filter="url(#fpPieShadow-{uid})">')
             for si, s in enumerate(el.slices):
                 anim_style = ""
                 if animate:
-                    delay = T_DATA + si * 0.08
-                    anim_style = f' style="animation:fp-areaFade 0.5s ease {delay:.2f}s both"'
+                    delay = T_DATA + si * 0.12
+                    anim_style = (f'--fp-pie-cx:{pie_cx_css};--fp-pie-cy:{pie_cy_css};'
+                                  f'animation:fp-pieSliceIn 0.6s cubic-bezier(0.22,1,0.36,1) {delay:.2f}s both;')
 
                 cos_s, sin_s = math.cos(s.start_angle), math.sin(s.start_angle)
                 cos_e, sin_e = math.cos(s.end_angle), math.sin(s.end_angle)
                 large = 1 if (s.end_angle - s.start_angle) > math.pi else 0
 
                 if el.donut:
-                    # Donut arc path
                     ox1, oy1 = pcx + pr * cos_s, pcy + pr * sin_s
                     ox2, oy2 = pcx + pr * cos_e, pcy + pr * sin_e
                     ix1, iy1 = pcx + inner_r * cos_s, pcy + inner_r * sin_s
@@ -878,16 +893,16 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                     path = (f"M{ox1:.1f},{oy1:.1f} A{pr:.1f},{pr:.1f} 0 {large} 1 {ox2:.1f},{oy2:.1f} "
                             f"L{ix2:.1f},{iy2:.1f} A{inner_r:.1f},{inner_r:.1f} 0 {large} 0 {ix1:.1f},{iy1:.1f} Z")
                 else:
-                    # Pie wedge path
                     sx, sy = pcx + pr * cos_s, pcy + pr * sin_s
                     ex, ey = pcx + pr * cos_e, pcy + pr * sin_e
                     path = f"M{pcx:.1f},{pcy:.1f} L{sx:.1f},{sy:.1f} A{pr:.1f},{pr:.1f} 0 {large} 1 {ex:.1f},{ey:.1f} Z"
 
-                lines.append(f'<path d="{path}" fill="url(#fpPieGrad-{uid}-{si})" '
-                             f'stroke="{theme.background}" stroke-width="1.5"{anim_style}/>')
+                style_attr = f' style="{anim_style}"' if anim_style else ''
+                lines.append(f'<path class="fp-pie-slice" d="{path}" fill="url(#fpPieGrad-{uid}-{si})" '
+                             f'stroke="{theme.background}" stroke-width="1"{style_attr}/>')
             lines.append('</g>')
 
-            # Percentage labels
+            # Percentage labels (smaller font, matching axis style)
             for si, s in enumerate(el.slices):
                 if s.pct < 0.06:
                     continue
@@ -896,12 +911,12 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                 ly = pcy + label_r * math.sin(s.mid_angle)
                 lbl_anim = ""
                 if animate:
-                    delay = T_DATA + 0.3 + si * 0.08
-                    lbl_anim = f' style="animation:fp-refFade 0.4s ease {delay:.2f}s both"'
+                    delay = T_DATA + 0.3 + si * 0.12
+                    lbl_anim = f'animation:fp-refFade 0.4s ease {delay:.2f}s both;'
                 fill = theme.background if not el.donut else "#e0e0e0"
-                lines.append(f'<text x="{lx:.1f}" y="{ly:.1f}" text-anchor="middle" '
-                             f'dominant-baseline="central" font-size="10" font-weight="600" '
-                             f'font-family="\'Inter\',sans-serif" fill="{fill}"{lbl_anim}>'
+                lines.append(f'<text class="fp-pie-lbl" x="{lx:.1f}" y="{ly:.1f}" text-anchor="middle" '
+                             f'dominant-baseline="central" font-size="8" font-weight="600" '
+                             f'font-family="\'Inter\',sans-serif" fill="{fill}" style="{lbl_anim}">'
                              f'{s.pct * 100:.0f}%</text>')
 
             # Donut center label
@@ -910,7 +925,7 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                 if animate:
                     lbl_anim = f' style="animation:fp-refFade 0.5s ease {T_DATA + 0.4:.2f}s both"'
                 lines.append(f'<text class="fp-title-text" x="{pcx:.1f}" y="{pcy:.1f}" text-anchor="middle" '
-                             f'dominant-baseline="central" font-size="11" font-weight="500" '
+                             f'dominant-baseline="central" font-size="9" font-weight="500" '
                              f'font-family="\'Inter\',sans-serif" fill="{theme.text_primary}"{lbl_anim}>Total</text>')
 
     # ── Legend (centered below x-axis) ──────────────────────────────────
