@@ -966,7 +966,9 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
         f"var isDark=s.getAttribute('class').indexOf('fp-dark')>=0;"
         f"var mode=e.currentTarget.getAttribute('data-mode');"
         f"if((mode==='dark'&&isDark)||(mode==='light'&&!isDark))return;"
-        f"s.setAttribute('class',mode==='dark'?'fp-dark':'fp-light');"
+        # Preserve fp-3d-active class when switching themes
+        f"var is3d=s.classList.contains('fp-3d-active');"
+        f"s.setAttribute('class',(mode==='dark'?'fp-dark':'fp-light')+(is3d?' fp-3d-active':''));"
         f"var bg=s.querySelector('.fp-bg');"
         f"bg.setAttribute('fill',mode==='dark'?'{theme.background}':'#f8f8f8');"
         f"var div=s.parentElement;"
@@ -976,11 +978,13 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
         f"var pc=mode==='dark'?'#2a2a2a':'#e8e8e8';"
         f"dp.setAttribute('fill',mode==='dark'?pc:'none');"
         f"lp.setAttribute('fill',mode==='light'?pc:'none');"
-        # Swap surface groups
+        # Only swap surface groups if NOT in 3D mode
+        f"if(!is3d){{"
         f"var sd=s.querySelectorAll('.fp-surface-dark');"
         f"var sl=s.querySelectorAll('.fp-surface-light');"
         f"for(var i=0;i<sd.length;i++)sd[i].setAttribute('display',mode==='dark'?'block':'none');"
         f"for(var i=0;i<sl.length;i++)sl[i].setAttribute('display',mode==='light'?'block':'none');"
+        f"}}"
         f"}})(event)"
     )
 
@@ -1193,7 +1197,10 @@ for(var si=0;si<svgs.length;si++){(function(S){
       S.classList.remove('fp-3d-active');
       gJ.innerHTML='';gJ.setAttribute('display','none');
       gA3.innerHTML='';gA3.setAttribute('display','none');
-      // Restore static view
+      // Restore correct 2D surface based on current theme
+      var dk=S.getAttribute('class').indexOf('fp-dark')>=0;
+      if(gSD)gSD.setAttribute('display',dk?'block':'none');
+      if(gSL)gSL.setAttribute('display',dk?'none':'block');
       if(gA2)gA2.setAttribute('display','block');
       if(gG)gG.setAttribute('display','block');
       if(btnLbl)btnLbl.textContent='3D';
