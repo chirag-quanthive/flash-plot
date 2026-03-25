@@ -915,10 +915,10 @@ class Axes:
                     _pie_palette[i % len(_pie_palette)]
                     for i in range(len(cmd.values))
                 ]
-                # Size pie to fit comfortably within plot area (leave room for title + legend)
-                pie_r = min(pa.w * 0.28, pa.h * 0.38)
-                pie_cx = pa.x + pa.w / 2
-                pie_cy = pa.y + pa.h / 2
+                # Size pie to fit left portion of plot area, legend goes on right
+                pie_r = min(pa.w * 0.22, pa.h * 0.38)
+                pie_cx = pa.x + pa.w * 0.35
+                pie_cy = pa.y + pa.h * 0.5
                 gap = 0.02  # radians gap between slices
                 slices: List[PieSlice] = []
                 angle = -math.pi / 2  # start from top
