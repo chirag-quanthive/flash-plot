@@ -915,7 +915,7 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
     # Settings panel (hidden by default)
     lines.append(f'<g id="fp-cfg-panel-{uid}" display="none">')
     lines.append(f'  <rect class="fp-panel-bg" x="{panel_x:.1f}" y="{panel_y:.1f}" width="{panel_w}" height="{panel_h}" '
-                 f'rx="6" fill="#1a1a1a" stroke="#2a2a2a" stroke-width="0.5"/>')
+                 f'rx="4" fill="#1a1a1a" stroke="#2a2a2a" stroke-width="0.5"/>')
 
     toggle_items = [
         ("Grid Lines", f"fp-grid-{uid}", True),
@@ -952,7 +952,7 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                      f'ck.setAttribute(\'opacity\',vis?\'0\':\'1\');'
                      f'{legend_vb_js}'
                      f'}})(event)">')
-        lines.append(f'    <rect class="fp-panel-check-box" x="{check_x:.1f}" y="{check_y:.1f}" width="14" height="14" rx="3" '
+        lines.append(f'    <rect class="fp-panel-check-box" x="{check_x:.1f}" y="{check_y:.1f}" width="14" height="14" rx="2" '
                      f'fill="none" stroke="#494949" stroke-width="0.8"/>')
         opacity = "1" if enabled else "0"
         lines.append(f'    <path class="fp-ck fp-panel-check-mark" d="M{check_x + 3:.1f} {check_y + 7:.1f} l3 3 l5 -6" '
@@ -969,7 +969,7 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                  f'stroke="#2a2a2a" stroke-width="0.5" class="fp-panel-check-box"/>')
 
     theme_y = sep_y + 8
-    theme_text_y = theme_y + 11
+    theme_text_y = theme_y + pill_h / 2  # vertical center of pill
     # Dark label
     dark_x = panel_x + 14
     light_x = panel_x + panel_w / 2 + 4
@@ -1008,18 +1008,18 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
     # Dark pill
     lines.append(f'  <g cursor="pointer" data-mode="dark" onclick="{theme_js}">')
     lines.append(f'    <rect id="fp-theme-dark-{uid}" x="{dark_x:.1f}" y="{theme_y:.1f}" '
-                 f'width="{pill_w:.1f}" height="{pill_h}" rx="4" fill="#2a2a2a"/>')
+                 f'width="{pill_w:.1f}" height="{pill_h}" rx="3" fill="#2a2a2a"/>')
     lines.append(f'    <text class="fp-panel-text" x="{dark_x + pill_w / 2:.1f}" y="{theme_text_y:.1f}" '
-                 f'text-anchor="middle" font-size="9" font-weight="600" '
+                 f'text-anchor="middle" dominant-baseline="central" font-size="9" font-weight="600" '
                  f'font-family="\'Inter\',sans-serif" fill="#808080">Dark</text>')
     lines.append('  </g>')
 
     # Light pill
     lines.append(f'  <g cursor="pointer" data-mode="light" onclick="{theme_js}">')
     lines.append(f'    <rect id="fp-theme-light-{uid}" x="{light_x:.1f}" y="{theme_y:.1f}" '
-                 f'width="{pill_w:.1f}" height="{pill_h}" rx="4" fill="none"/>')
+                 f'width="{pill_w:.1f}" height="{pill_h}" rx="3" fill="none"/>')
     lines.append(f'    <text class="fp-panel-text" x="{light_x + pill_w / 2:.1f}" y="{theme_text_y:.1f}" '
-                 f'text-anchor="middle" font-size="9" font-weight="600" '
+                 f'text-anchor="middle" dominant-baseline="central" font-size="9" font-weight="600" '
                  f'font-family="\'Inter\',sans-serif" fill="#808080">Light</text>')
     lines.append('  </g>')
 
