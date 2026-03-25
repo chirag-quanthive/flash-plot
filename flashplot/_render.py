@@ -136,8 +136,7 @@ _CSS_ANIMATIONS = """
 .fp-light .fp-tip-label { fill: #555555 !important; }
 .fp-light .fp-tip-value { fill: #222222 !important; }
 .fp-light .fp-legend-text { fill: #555555 !important; }
-/* Light mode bars: light grey base fill, soften glow effects */
-.fp-light .fp-bar-base-rect { fill: #e0e0e0 !important; }
+/* Light mode bars: soften dark glow/highlight effects to subtle light grey */
 .fp-light .fp-drift { opacity: 0.12 !important; }
 .fp-light .fp-bar-base-glow .fp-drift { opacity: 0.12 !important; }
 .fp-light .fp-surface-dark { display: none !important; }
@@ -593,7 +592,7 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                     # Stacked bars: hidden by default, show only on hover
                     lines.append(f'  <g class="fp-bar-glow" clip-path="url(#{clip_id})">')
 
-                lines.append(f'    <rect class="fp-bar-base-rect" x="{bar.x:.1f}" y="{bar.y:.1f}" width="{bar.width:.1f}" height="{bar.height:.1f}" fill="{st.fill}" style="{grow_style}"/>')
+                lines.append(f'    <rect x="{bar.x:.1f}" y="{bar.y:.1f}" width="{bar.width:.1f}" height="{bar.height:.1f}" fill="{st.fill}" style="{grow_style}"/>')
 
                 sc = lambda hv: (hv / 134) * bar.height
                 bx, bw = bar.x, bar.width
