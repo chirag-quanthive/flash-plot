@@ -200,10 +200,32 @@ class SurfacePlotElement:
     azimuth: float = -0.6
     elevation: float = 0.5
 
+@dataclass
+class PieSlice:
+    label: str
+    value: float
+    color: str
+    start_angle: float = 0.0
+    end_angle: float = 0.0
+    mid_angle: float = 0.0
+    pct: float = 0.0
+
+@dataclass
+class PiePlotElement:
+    kind: str = "pie"
+    slices: List[PieSlice] = field(default_factory=list)
+    donut: bool = False
+    donut_ratio: float = 0.55
+    cx: float = 0.0
+    cy: float = 0.0
+    radius: float = 0.0
+    label: Optional[str] = None
+    zorder: int = 0
+
 PlotElement = Union[
     LinePlotElement, AreaPlotElement, BarPlotElement, ScatterPlotElement,
     HLinePlotElement, VLinePlotElement, TextPlotElement, AnnotationPlotElement,
-    BoxPlotElement, ViolinPlotElement, SurfacePlotElement,
+    BoxPlotElement, ViolinPlotElement, SurfacePlotElement, PiePlotElement,
 ]
 
 @dataclass
@@ -312,6 +334,14 @@ class _ViolinCmd:
     datasets: List[List[float]] = field(default_factory=list)
     opts: Dict[str, Any] = field(default_factory=dict)
 
+@dataclass
+class _PieCmd:
+    kind: str = "pie"
+    values: List[float] = field(default_factory=list)
+    labels: List[str] = field(default_factory=list)
+    colors: Optional[List[str]] = None
+    opts: Dict[str, Any] = field(default_factory=dict)
+
 
 # ── Axes Class ──────────────────────────────────────────────────────────
 
@@ -403,6 +433,13 @@ class Axes:
         if "labels" in kwargs and self._xticks is None:
             self._xticks = list(kwargs["labels"])
         self._commands.append(_ViolinCmd(datasets=ds, opts=kwargs))
+        return self
+
+    def pie(self, values, labels=None, colors=None, **kwargs) -> "Axes":
+        """pie([30, 20, 50], labels=["A","B","C"], colors=[...], donut=True)"""
+        vals = list(values)
+        lbls = list(labels) if labels else [f"Slice {i+1}" for i in range(len(vals))]
+        self._commands.append(_PieCmd(values=vals, labels=lbls, colors=colors, opts=kwargs))
         return self
 
     def axhline(self, y, **kwargs) -> "Axes":
@@ -543,6 +580,12 @@ class Axes:
                 for ds in cmd.datasets:
                     for v in ds:
                         y_lo, y_hi = min(y_lo, v), max(y_hi, v)
+            elif isinstance(cmd, _PieCmd):
+                # Pie charts don't use x/y axes; set defaults
+                if x_lo == float("inf"):
+                    x_lo, x_hi = 0, 1
+                if y_lo == float("inf"):
+                    y_lo, y_hi = 0, 1
 
         if has_bar:
             y_lo = min(y_lo, 0)
@@ -860,6 +903,43 @@ class Axes:
                 elements.append(el)
                 if el.label:
                     legend_entries.append(LegendEntry(el.label, color, "area"))
+
+            elif isinstance(cmd, _PieCmd):
+                total = sum(cmd.values) or 1
+                donut = cmd.opts.get("donut", False)
+                donut_ratio = cmd.opts.get("donut_ratio", 0.55)
+                pie_colors = cmd.colors or [
+                    self._theme.default_colors[i % len(self._theme.default_colors)]
+                    for i in range(len(cmd.values))
+                ]
+                # Center pie in plot area
+                pie_r = min(pa.w, pa.h) * 0.42
+                pie_cx = pa.x + pa.w / 2
+                pie_cy = pa.y + pa.h / 2
+                gap = 0.02  # radians gap between slices
+                slices: List[PieSlice] = []
+                angle = -math.pi / 2  # start from top
+                for i, val in enumerate(cmd.values):
+                    pct = val / total
+                    sweep = pct * math.pi * 2
+                    slice_gap = gap / 2 if len(cmd.values) > 1 else 0
+                    s_angle = angle + slice_gap
+                    e_angle = angle + sweep - slice_gap
+                    m_angle = angle + sweep / 2
+                    slices.append(PieSlice(
+                        label=cmd.labels[i], value=val, color=pie_colors[i],
+                        start_angle=s_angle, end_angle=e_angle,
+                        mid_angle=m_angle, pct=pct,
+                    ))
+                    legend_entries.append(LegendEntry(cmd.labels[i], pie_colors[i], "bar",
+                                                      bar_gradient=(pie_colors[i], pie_colors[i])))
+                    angle += sweep
+                el = PiePlotElement(
+                    slices=slices, donut=donut, donut_ratio=donut_ratio,
+                    cx=pie_cx, cy=pie_cy, radius=pie_r,
+                    label=cmd.opts.get("label"), zorder=cmd.opts.get("zorder", z),
+                )
+                elements.append(el)
 
         elements.sort(key=lambda e: e.zorder)
 

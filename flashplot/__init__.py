@@ -29,6 +29,7 @@ from ._core import (
 
 from ._figure import (
     Scene, SubplotScene, Figure, Axes, figure,
+    PieSlice, PiePlotElement,
 )
 
 from ._render import render_svg, render_html
