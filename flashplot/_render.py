@@ -406,8 +406,22 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
     # Check if subplot contains only pie charts (skip grid/axes)
     is_pie_only = all(isinstance(el, PiePlotElement) for el in sp.elements) and len(sp.elements) > 0
 
-    # Add extra height for legend below x-axis
-    legend_extra_h = 50 if (sp.legend and sp.legend.entries) else 0
+    # Add extra height for legend below x-axis (more for pie charts with many items)
+    if sp.legend and sp.legend.entries:
+        # Estimate legend rows needed
+        _max_w = w - 80
+        _row_w = 0.0
+        _n_rows = 1
+        for _le in sp.legend.entries:
+            _iw = 14 + 4 + len(_le.label) * 4.8 + 16
+            if _row_w > 0 and _row_w + _iw > _max_w:
+                _n_rows += 1
+                _row_w = _iw
+            else:
+                _row_w += _iw
+        legend_extra_h = 30 + _n_rows * 18
+    else:
+        legend_extra_h = 0
     svg_h = h + legend_extra_h
     lines.append(f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w:.1f} {svg_h:.1f}" '
                  f'class="fp-dark" '
@@ -928,35 +942,53 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                              f'dominant-baseline="central" font-size="9" font-weight="500" '
                              f'font-family="\'Inter\',sans-serif" fill="{theme.text_primary}"{lbl_anim}>Total</text>')
 
-    # ── Legend (centered below x-axis) ──────────────────────────────────
+    # ── Legend (centered below x-axis, wraps to multiple rows if needed) ─
     has_legend = sp.legend and sp.legend.entries
     if has_legend:
         lines.append(f'<g id="fp-legend-{uid}">')
-        # Estimate total legend width: each entry = swatch(14) + gap(4) + ~6px per char + gap(16)
+        item_gap = 16
+        row_h = 18
         item_widths = []
         for le in sp.legend.entries:
-            swatch_w = 14
-            text_w = len(le.label) * 5.5  # approximate at font-size 9
-            item_widths.append(swatch_w + 4 + text_w)
-        gap = 16
-        total_leg_w = sum(item_widths) + gap * (len(item_widths) - 1)
-        leg_start_x = pa.x + (pa.w - total_leg_w) / 2
-        leg_y = pa.y + pa.h + 58  # generous gap below x-axis labels
-        cur_x = leg_start_x
-        for li, le in enumerate(sp.legend.entries):
-            if le.kind == "bar" and le.bar_gradient:
-                lines.append(f'  <rect x="{cur_x:.1f}" y="{leg_y:.1f}" width="10" height="10" rx="2" '
-                             f'fill="{le.color}"/>')
-            elif le.kind == "scatter":
-                lines.append(f'  <circle cx="{cur_x + 5:.1f}" cy="{leg_y + 5:.1f}" r="3.5" fill="{le.color}"/>')
+            text_w = len(le.label) * 4.8  # approximate at font-size 9
+            item_widths.append(14 + 4 + text_w)
+        # Split items into rows that fit within SVG width
+        max_row_w = w - pa.x * 2
+        rows: list = []  # list of (start_idx, end_idx) tuples
+        row_start = 0
+        row_w = 0.0
+        for i, iw in enumerate(item_widths):
+            needed = iw + (item_gap if row_w > 0 else 0)
+            if row_w > 0 and row_w + needed > max_row_w:
+                rows.append((row_start, i))
+                row_start = i
+                row_w = iw
             else:
-                da = dash_array(le.line_style) if le.line_style else None
-                extra = f' stroke-dasharray="{da}"' if da else ""
-                lines.append(f'  <line x1="{cur_x:.1f}" y1="{leg_y + 5:.1f}" x2="{cur_x + 12:.1f}" y2="{leg_y + 5:.1f}" '
-                             f'stroke="{le.color}" stroke-width="{le.line_width or 1.5}"{extra}/>')
-            lines.append(f'  <text class="fp-legend-text" x="{cur_x + 18:.1f}" y="{leg_y + 9:.1f}" font-size="9" font-weight="500" '
-                         f'font-family="\'Inter\',sans-serif" fill="#808080">{_esc(le.label)}</text>')
-            cur_x += item_widths[li] + gap
+                row_w += needed
+        rows.append((row_start, len(item_widths)))
+
+        base_leg_y = pa.y + pa.h + (58 if not is_pie_only else 14)
+        for row_idx, (rs, re) in enumerate(rows):
+            row_items = list(range(rs, re))
+            row_total = sum(item_widths[j] for j in row_items) + item_gap * (len(row_items) - 1)
+            row_x = pa.x + (pa.w - row_total) / 2
+            leg_y = base_leg_y + row_idx * row_h
+            cur_x = row_x
+            for li in row_items:
+                le = sp.legend.entries[li]
+                if le.kind == "bar" and le.bar_gradient:
+                    lines.append(f'  <rect x="{cur_x:.1f}" y="{leg_y:.1f}" width="10" height="10" rx="2" '
+                                 f'fill="{le.color}"/>')
+                elif le.kind == "scatter":
+                    lines.append(f'  <circle cx="{cur_x + 5:.1f}" cy="{leg_y + 5:.1f}" r="3.5" fill="{le.color}"/>')
+                else:
+                    da = dash_array(le.line_style) if le.line_style else None
+                    extra = f' stroke-dasharray="{da}"' if da else ""
+                    lines.append(f'  <line x1="{cur_x:.1f}" y1="{leg_y + 5:.1f}" x2="{cur_x + 12:.1f}" y2="{leg_y + 5:.1f}" '
+                                 f'stroke="{le.color}" stroke-width="{le.line_width or 1.5}"{extra}/>')
+                lines.append(f'  <text class="fp-legend-text" x="{cur_x + 18:.1f}" y="{leg_y + 9:.1f}" font-size="9" font-weight="500" '
+                             f'font-family="\'Inter\',sans-serif" fill="#808080">{_esc(le.label)}</text>')
+                cur_x += item_widths[li] + item_gap
         lines.append('</g>')
 
     # ── Hover overlay (rendered last so it's on top of all elements) ───
