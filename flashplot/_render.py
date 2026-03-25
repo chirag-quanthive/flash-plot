@@ -418,27 +418,48 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
             lines.append("</filter>")
     lines.append("</defs>")
 
-    # ── Title & Subtitle ─────────────────────────────────────────────────
-    # Position from top: equal gap above title and below subtitle
+    # ── Title & Subtitle (click-to-edit) ──────────────────────────────────
+    _edit_js = (
+        "(function(e){"
+        "var g=e.currentTarget,s=g.ownerSVGElement,t=g.querySelector('text');"
+        "if(!t)return;"
+        "var x=+t.getAttribute('x'),y=+t.getAttribute('y'),fs=+t.getAttribute('font-size');"
+        "var fo=document.createElementNS('http://www.w3.org/2000/svg','foreignObject');"
+        "fo.setAttribute('x',x);fo.setAttribute('y',y-fs);fo.setAttribute('width',%WIDTH%);fo.setAttribute('height',fs+12);"
+        "var inp=document.createElement('input');inp.value=t.textContent;"
+        "inp.style.cssText='background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,0.3);"
+        "outline:none;color:'+t.getAttribute('fill')+';font-size:'+fs+'px;font-weight:'+t.getAttribute('font-weight')+"
+        "';font-family:'+t.getAttribute('font-family')+';width:100%;padding:2px 0;';"
+        "var done=function(){t.textContent=inp.value;g.removeChild(fo);t.style.display='';};"
+        "inp.addEventListener('blur',done);inp.addEventListener('keydown',function(ev){if(ev.key==='Enter')done();});"
+        "t.style.display='none';fo.appendChild(inp);g.appendChild(fo);inp.focus();"
+        "})(event)"
+    )
     if sp.title and sp.title_style:
         title_top = 18  # top margin
         ty = title_top + sp.title_style.font_size
         anim_style = ""
         if animate:
             anim_style = f' style="animation:fp-refFade 0.5s ease 0.2s both"'
+        title_edit_js = _edit_js.replace('%WIDTH%', f'{pa.w:.0f}')
+        lines.append(f'<g cursor="pointer" onclick="{_esc(title_edit_js)}">')
         lines.append(f'<text class="fp-title-text" x="{pa.x:.1f}" y="{ty:.1f}" '
                      f'font-size="{sp.title_style.font_size}" font-weight="{sp.title_style.font_weight}" '
                      f'font-family="{_esc(sp.title_style.font_family)}" '
                      f'fill="{sp.title_style.color}"{anim_style}>{_esc(sp.title)}</text>')
+        lines.append('</g>')
     if sp.subtitle and sp.subtitle_style:
         sy = 18 + (sp.title_style.font_size + 6 if sp.title else 0) + sp.subtitle_style.font_size
         anim_style = ""
         if animate:
             anim_style = f' style="animation:fp-refFade 0.5s ease 0.35s both"'
+        sub_edit_js = _edit_js.replace('%WIDTH%', f'{pa.w:.0f}')
+        lines.append(f'<g cursor="pointer" onclick="{_esc(sub_edit_js)}">')
         lines.append(f'<text class="fp-subtitle-text" x="{pa.x:.1f}" y="{sy:.1f}" '
                      f'font-size="{sp.subtitle_style.font_size}" font-weight="{sp.subtitle_style.font_weight}" '
                      f'font-family="{_esc(sp.subtitle_style.font_family)}" '
                      f'fill="{sp.subtitle_style.color}"{anim_style}>{_esc(sp.subtitle)}</text>')
+        lines.append('</g>')
 
     # ── Grid ────────────────────────────────────────────────────────────
     lines.append(f'<g id="fp-grid-{uid}">')
@@ -805,27 +826,35 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
             lines.append(f'<desc id="fp-sdata-{uid}" style="display:none">'
                          f'{_esc(json.dumps(surf_data, separators=(",",":")))}</desc>')
 
-    # ── Legend ────────────────────────────────────────────────────────────
+    # ── Legend (centered below x-axis) ──────────────────────────────────
     has_legend = sp.legend and sp.legend.entries
     if has_legend:
         lines.append(f'<g id="fp-legend-{uid}">')
-        leg_x = pa.x + pa.w - 8
-        leg_y = pa.y + 8
-        row_h = 16
+        # Estimate total legend width: each entry = swatch(14) + gap(4) + ~6px per char + gap(16)
+        item_widths = []
+        for le in sp.legend.entries:
+            swatch_w = 14
+            text_w = len(le.label) * 5.5  # approximate at font-size 9
+            item_widths.append(swatch_w + 4 + text_w)
+        gap = 16
+        total_leg_w = sum(item_widths) + gap * (len(item_widths) - 1)
+        leg_start_x = pa.x + (pa.w - total_leg_w) / 2
+        leg_y = pa.y + pa.h + 28  # below x-axis labels
+        cur_x = leg_start_x
         for li, le in enumerate(sp.legend.entries):
-            ly = leg_y + li * row_h
             if le.kind == "bar" and le.bar_gradient:
-                lines.append(f'  <rect x="{leg_x - 80:.1f}" y="{ly:.1f}" width="10" height="10" rx="2" '
+                lines.append(f'  <rect x="{cur_x:.1f}" y="{leg_y:.1f}" width="10" height="10" rx="2" '
                              f'fill="{le.color}"/>')
             elif le.kind == "scatter":
-                lines.append(f'  <circle cx="{leg_x - 75:.1f}" cy="{ly + 5:.1f}" r="3.5" fill="{le.color}"/>')
+                lines.append(f'  <circle cx="{cur_x + 5:.1f}" cy="{leg_y + 5:.1f}" r="3.5" fill="{le.color}"/>')
             else:
                 da = dash_array(le.line_style) if le.line_style else None
                 extra = f' stroke-dasharray="{da}"' if da else ""
-                lines.append(f'  <line x1="{leg_x - 82:.1f}" y1="{ly + 5:.1f}" x2="{leg_x - 68:.1f}" y2="{ly + 5:.1f}" '
+                lines.append(f'  <line x1="{cur_x:.1f}" y1="{leg_y + 5:.1f}" x2="{cur_x + 12:.1f}" y2="{leg_y + 5:.1f}" '
                              f'stroke="{le.color}" stroke-width="{le.line_width or 1.5}"{extra}/>')
-            lines.append(f'  <text class="fp-legend-text" x="{leg_x - 62:.1f}" y="{ly + 9:.1f}" font-size="9" font-weight="500" '
+            lines.append(f'  <text class="fp-legend-text" x="{cur_x + 18:.1f}" y="{leg_y + 9:.1f}" font-size="9" font-weight="500" '
                          f'font-family="\'Inter\',sans-serif" fill="#808080">{_esc(le.label)}</text>')
+            cur_x += item_widths[li] + gap
         lines.append('</g>')
 
     # ── Hover overlay (rendered last so it's on top of all elements) ───
