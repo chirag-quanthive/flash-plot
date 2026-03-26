@@ -953,7 +953,13 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
     # ── Legend ────────────────────────────────────────────────────────────
     has_legend = sp.legend and sp.legend.entries
     if has_legend:
-        lines.append(f'<g id="fp-legend-{uid}">')
+        # For pie charts, fade legend in after pie animation completes
+        if is_pie_only and animate:
+            n_pie_slices = sum(len(el.slices) for el in sp.elements if isinstance(el, PiePlotElement))
+            leg_delay = T_DATA + max(0, n_pie_slices - 1) * 0.12 + 0.5
+            lines.append(f'<g id="fp-legend-{uid}" style="opacity:0;animation:fp-refFade 0.5s ease {leg_delay:.2f}s both">')
+        else:
+            lines.append(f'<g id="fp-legend-{uid}">')
 
         if is_pie_only:
             # Pie charts: stacked legend right-aligned
