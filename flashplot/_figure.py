@@ -517,7 +517,7 @@ class Axes:
         if self._subtitle:
             header_h += 14
         if header_h > 0:
-            header_h += 6 if _is_pie_only else 14  # gap below header
+            header_h += 2 if _is_pie_only else 14  # gap below header
         if header_h > 0:
             pa = Rect(pa.x, pa.y + header_h, pa.w, pa.h - header_h)
 
@@ -922,7 +922,7 @@ class Axes:
                     for i in range(len(cmd.values))
                 ]
                 # Size pie to fit left portion of plot area, legend goes on right
-                pie_r = min(pa.w * 0.18, pa.h * 0.36)
+                pie_r = min(pa.w * 0.20, pa.h * 0.46)
                 pie_cx = pa.x + pie_r + 2
                 pie_cy = pa.y + pa.h * 0.5
                 gap = 0.02  # radians gap between slices

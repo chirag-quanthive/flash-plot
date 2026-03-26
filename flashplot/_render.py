@@ -421,7 +421,10 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
             else:
                 _row_w += _iw
         legend_extra_h = 30 + _n_rows * 18
-    svg_h = h + legend_extra_h
+    if is_pie_only:
+        svg_h = pa.y + pa.h + 6  # tight crop for pie charts
+    else:
+        svg_h = h + legend_extra_h
     lines.append(f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w:.1f} {svg_h:.1f}" '
                  f'class="fp-dark" '
                  f'style="width:100%;height:auto;display:block;font-family:\'Inter\',sans-serif;">')
