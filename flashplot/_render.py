@@ -868,13 +868,27 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
             # 3D axes group (empty, populated by script)
             lines.append(f'<g id="fp-axes3d-{uid}"></g>')
             # Embed raw data for interactive JS
+            # Compute real x/y ranges from data grids or default 0..cols/rows
+            rows = len(el.z_data)
+            cols = len(el.z_data[0]) if rows else 0
+            if el.x_data and len(el.x_data) > 0 and len(el.x_data[0]) > 0:
+                x_min_r = min(min(row) for row in el.x_data)
+                x_max_r = max(max(row) for row in el.x_data)
+            else:
+                x_min_r, x_max_r = 0, max(1, cols - 1)
+            if el.y_data and len(el.y_data) > 0 and len(el.y_data[0]) > 0:
+                y_min_r = min(min(row) for row in el.y_data)
+                y_max_r = max(max(row) for row in el.y_data)
+            else:
+                y_min_r, y_max_r = 0, max(1, rows - 1)
             surf_data = {
-                "z": el.z_data, "rows": len(el.z_data), "cols": len(el.z_data[0]),
+                "z": el.z_data, "rows": rows, "cols": cols,
                 "az": el.azimuth, "el": el.elevation, "wf": el.wireframe,
                 "pa": {"x": round(pa.x, 1), "y": round(pa.y, 1),
                         "w": round(pa.w, 1), "h": round(pa.h, 1)},
                 "zMn": round(el.z_min, 6), "zMx": round(el.z_max, 6),
-                "xMn": 0, "xMx": 1, "yMn": 0, "yMx": 1,
+                "xMn": round(x_min_r, 6), "xMx": round(x_max_r, 6),
+                "yMn": round(y_min_r, 6), "yMx": round(y_max_r, 6),
                 "dc": dark_cmap, "lc": light_cmap,
             }
             lines.append(f'<desc id="fp-sdata-{uid}" style="display:none">'
@@ -1250,10 +1264,13 @@ for(var si=0;si<svgs.length;si++){(function(S){
     var cfg=JSON.parse(desc.textContent);
     var Z=cfg.z,R=cfg.rows,C=cfg.cols;
     var az=cfg.az,el=cfg.el,wf=cfg.wf;
+    var initAz=az,initEl=el;
     var pa=cfg.pa,zMn=cfg.zMn,zMx=cfg.zMx,zR=zMx-zMn||1;
     var dc=cfg.dc,lc=cfg.lc;
     var xMn=cfg.xMn,xMx=cfg.xMx,yMn=cfg.yMn,yMx=cfg.yMx;
-    var cx=pa.x+pa.w/2,cy=pa.y+pa.h/2,sc=Math.min(pa.w,pa.h)*.38;
+    var baseSc=Math.min(pa.w,pa.h)*.38;
+    var zoom=1.0,minZoom=0.4,maxZoom=3.0;
+    var cx=pa.x+pa.w/2,cy=pa.y+pa.h/2;
 
     var gJ=S.querySelector('#fp-surfjs-'+uid);
     var gA3=S.querySelector('#fp-axes3d-'+uid);
@@ -1266,7 +1283,11 @@ for(var si=0;si<svgs.length;si++){(function(S){
 
     var is3D=false;
 
+    // Tooltip element (created once, reused)
+    var tip=null;
+
     function proj(x,y,z){
+      var sc=baseSc*zoom;
       var ca=Math.cos(az),sa=Math.sin(az),ce=Math.cos(el),se=Math.sin(el);
       var x1=x*ca-y*sa,y1=x*sa+y*ca;
       var y2=y1*ce-z*se,z2=y1*se+z*ce;
@@ -1288,46 +1309,52 @@ for(var si=0;si<svgs.length;si++){(function(S){
       return'#'+((1<<24)|(Math.min(255,Math.round(r*sf))<<16)|(Math.min(255,Math.round(g*sf))<<8)|Math.min(255,Math.round(b*sf))).toString(16).substr(1);
     }
 
+    // Store face metadata for hover tooltips
+    var faces=[];
     function render(){
       var P=[];
       for(var r=0;r<R;r++){P[r]=[];for(var c=0;c<C;c++){
         var nx=2*c/Math.max(C-1,1)-1,ny=2*r/Math.max(R-1,1)-1,nz=2*(Z[r][c]-zMn)/zR-1;
         P[r][c]=proj(nx,ny,nz);
       }}
-      var F=[];
+      faces=[];
       for(var r=0;r<R-1;r++)for(var c=0;c<C-1;c++){
         var a=P[r][c],b=P[r][c+1],d=P[r+1][c],e=P[r+1][c+1];
         var za=(a[2]+b[2]+d[2]+e[2])/4;
         var zn=((Z[r][c]+Z[r][c+1]+Z[r+1][c]+Z[r+1][c+1])/4-zMn)/zR;
         var bx=b[0]-a[0],by=b[1]-a[1],dx=d[0]-a[0],dy=d[1]-a[1];
-        F.push([[a,b,e,d],za,zn,bx*dy-by*dx]);
+        // Store row/col for tooltip lookup
+        faces.push({pts:[a,b,e,d],za:za,zn:zn,nm:bx*dy-by*dx,r:r,c:c});
       }
-      F.sort(function(a,b){return a[1]-b[1]});
+      faces.sort(function(a,b){return a.za-b.za});
 
       var dk=S.getAttribute('class').indexOf('fp-dark')>=0;
       var cm=dk?dc:lc,ws=dk?'#2a2a2a':'#d0d0d0';
 
       var h='';
-      for(var i=0;i<F.length;i++){
-        var f=F[i],sh=f[3]?0.5+0.5*(f[3]/(Math.abs(f[3])+1e-6)):0.5;
-        var fl=sC(f[2],sh,cm);
-        var d='M'+f[0][0][0].toFixed(1)+','+f[0][0][1].toFixed(1);
-        for(var j=1;j<4;j++)d+=' L'+f[0][j][0].toFixed(1)+','+f[0][j][1].toFixed(1);
-        h+='<path d="'+d+' Z" fill="'+fl+'" fill-opacity="0.85"';
+      for(var i=0;i<faces.length;i++){
+        var f=faces[i],sh=f.nm?0.5+0.5*(f.nm/(Math.abs(f.nm)+1e-6)):0.5;
+        var fl=sC(f.zn,sh,cm);
+        var d='M'+f.pts[0][0].toFixed(1)+','+f.pts[0][1].toFixed(1);
+        for(var j=1;j<4;j++)d+=' L'+f.pts[j][0].toFixed(1)+','+f.pts[j][1].toFixed(1);
+        h+='<path d="'+d+' Z" fill="'+fl+'" fill-opacity="0.85" data-fi="'+i+'"';
         if(wf)h+=' stroke="'+ws+'" stroke-width="0.3" stroke-opacity="0.5"';
-        h+='/>';
+        h+=' style="pointer-events:all"/>';
       }
       gJ.innerHTML=h;
       renderAxes(dk);
     }
 
+    function fmtN(v){return Math.abs(v)<0.01?v.toExponential(2):v.toFixed(2);}
+
     function renderAxes(dk){
-      var tc=dk?'#555':'#888',ac=dk?'#333':'#ccc';
-      var ff="font-size='9' font-weight='500' font-family=\"'Inter',sans-serif\"";
+      var tc=dk?'#555':'#888',ac=dk?'#333':'#ccc',lc2=dk?'#666':'#999';
+      var ff="font-size='8' font-weight='500' font-family=\"'Inter',sans-serif\"";
+      var lf="font-size='9' font-weight='600' font-family=\"'Inter',sans-serif\"";
       // Axis endpoints
       var o=proj(-1,-1,-1),xE=proj(1,-1,-1),yE=proj(-1,1,-1),zE=proj(-1,-1,1);
       // Additional box edges
-      var xyB=proj(1,1,-1),xzT=proj(1,-1,1),yzT=proj(-1,1,1),xyzT=proj(1,1,1);
+      var xyB=proj(1,1,-1),xzT=proj(1,-1,1),yzT=proj(-1,1,1);
       var h='';
       // Bottom face (ground plane)
       h+='<line x1="'+o[0].toFixed(1)+'" y1="'+o[1].toFixed(1)+'" x2="'+xE[0].toFixed(1)+'" y2="'+xE[1].toFixed(1)+'" stroke="'+ac+'" stroke-width="0.5" stroke-opacity="0.6"/>';
@@ -1340,27 +1367,33 @@ for(var si=0;si<svgs.length;si++){(function(S){
       h+='<line x1="'+xE[0].toFixed(1)+'" y1="'+xE[1].toFixed(1)+'" x2="'+xzT[0].toFixed(1)+'" y2="'+xzT[1].toFixed(1)+'" stroke="'+ac+'" stroke-width="0.3" stroke-opacity="0.2"/>';
       h+='<line x1="'+yE[0].toFixed(1)+'" y1="'+yE[1].toFixed(1)+'" x2="'+yzT[0].toFixed(1)+'" y2="'+yzT[1].toFixed(1)+'" stroke="'+ac+'" stroke-width="0.3" stroke-opacity="0.2"/>';
 
-      // X ticks (along bottom x-axis)
+      // X ticks
       for(var i=0;i<=4;i++){
         var t=i/4,v=-1+2*t,p=proj(v,-1,-1);
-        var lbl=(t*(xMx-xMn)+xMn).toFixed(1);
+        var lbl=fmtN(t*(xMx-xMn)+xMn);
         h+='<text x="'+p[0].toFixed(1)+'" y="'+(p[1]+14).toFixed(1)+'" text-anchor="middle" '+ff+' fill="'+tc+'">'+lbl+'</text>';
         h+='<line x1="'+p[0].toFixed(1)+'" y1="'+p[1].toFixed(1)+'" x2="'+p[0].toFixed(1)+'" y2="'+(p[1]+3).toFixed(1)+'" stroke="'+ac+'" stroke-width="0.5"/>';
       }
-      // Y ticks (along bottom y-axis)
+      // Y ticks
       for(var i=0;i<=4;i++){
         var t=i/4,v=-1+2*t,p=proj(-1,v,-1);
-        var lbl=(t*(yMx-yMn)+yMn).toFixed(1);
+        var lbl=fmtN(t*(yMx-yMn)+yMn);
         h+='<text x="'+(p[0]-8).toFixed(1)+'" y="'+(p[1]+4).toFixed(1)+'" text-anchor="end" '+ff+' fill="'+tc+'">'+lbl+'</text>';
         h+='<line x1="'+p[0].toFixed(1)+'" y1="'+p[1].toFixed(1)+'" x2="'+(p[0]-3).toFixed(1)+'" y2="'+p[1].toFixed(1)+'" stroke="'+ac+'" stroke-width="0.5"/>';
       }
-      // Z ticks (along vertical z-axis)
+      // Z ticks
       for(var i=0;i<=4;i++){
         var t=i/4,v=-1+2*t,p=proj(-1,-1,v);
-        var lbl=(t*zR+zMn).toFixed(1);
+        var lbl=fmtN(t*zR+zMn);
         h+='<text x="'+(p[0]-8).toFixed(1)+'" y="'+(p[1]+4).toFixed(1)+'" text-anchor="end" '+ff+' fill="'+tc+'">'+lbl+'</text>';
         h+='<line x1="'+p[0].toFixed(1)+'" y1="'+p[1].toFixed(1)+'" x2="'+(p[0]-3).toFixed(1)+'" y2="'+p[1].toFixed(1)+'" stroke="'+ac+'" stroke-width="0.5"/>';
       }
+
+      // Axis labels
+      var xM=proj(0,-1,-1),yM=proj(-1,0,-1),zM=proj(-1,-1,0);
+      h+='<text x="'+xM[0].toFixed(1)+'" y="'+(xM[1]+26).toFixed(1)+'" text-anchor="middle" '+lf+' fill="'+lc2+'">X</text>';
+      h+='<text x="'+(yM[0]-18).toFixed(1)+'" y="'+(yM[1]+4).toFixed(1)+'" text-anchor="end" '+lf+' fill="'+lc2+'">Y</text>';
+      h+='<text x="'+(zM[0]-18).toFixed(1)+'" y="'+(zM[1]+4).toFixed(1)+'" text-anchor="end" '+lf+' fill="'+lc2+'">Z</text>';
 
       // Ground plane grid lines (subtle)
       for(var i=1;i<4;i++){
@@ -1371,8 +1404,52 @@ for(var si=0;si<svgs.length;si++){(function(S){
         h+='<line x1="'+c[0].toFixed(1)+'" y1="'+c[1].toFixed(1)+'" x2="'+d2[0].toFixed(1)+'" y2="'+d2[1].toFixed(1)+'" stroke="'+ac+'" stroke-width="0.3" stroke-opacity="0.2"/>';
       }
 
+      // Back wall grid (z-axis plane, subtle)
+      for(var i=1;i<4;i++){
+        var t=i/4,v=-1+2*t;
+        var a=proj(-1,-1,v),b2=proj(1,-1,v);
+        h+='<line x1="'+a[0].toFixed(1)+'" y1="'+a[1].toFixed(1)+'" x2="'+b2[0].toFixed(1)+'" y2="'+b2[1].toFixed(1)+'" stroke="'+ac+'" stroke-width="0.2" stroke-opacity="0.12"/>';
+        var c=proj(-1,-1,v),d2=proj(-1,1,v);
+        h+='<line x1="'+c[0].toFixed(1)+'" y1="'+c[1].toFixed(1)+'" x2="'+d2[0].toFixed(1)+'" y2="'+d2[1].toFixed(1)+'" stroke="'+ac+'" stroke-width="0.2" stroke-opacity="0.12"/>';
+      }
+
       gA3.innerHTML=h;
     }
+
+    // ── Tooltip ─────────────────────────────────────────────────────────
+    function showTip(mx,my,fi){
+      var f=faces[fi]; if(!f)return;
+      var r=f.r,c=f.c;
+      var xv=(c+0.5)/Math.max(C-1,1)*(xMx-xMn)+xMn;
+      var yv=(r+0.5)/Math.max(R-1,1)*(yMx-yMn)+yMn;
+      var zv=(Z[r][c]+Z[r][c+1]+Z[r+1][c]+Z[r+1][c+1])/4;
+      var dk=S.getAttribute('class').indexOf('fp-dark')>=0;
+      var bg=dk?'rgba(30,30,30,0.92)':'rgba(255,255,255,0.92)';
+      var bd=dk?'#444':'#ccc';var tc2=dk?'#ccc':'#333';var tc3=dk?'#888':'#666';
+
+      if(!tip){
+        tip=document.createElementNS('http://www.w3.org/2000/svg','g');
+        tip.setAttribute('pointer-events','none');
+        tip.setAttribute('id','fp-tip3d-'+uid);
+        S.appendChild(tip);
+      }
+      var tw=80,th=42,tx=mx+10,ty=my-th-6;
+      // Keep tooltip in view
+      var vb=S.getAttribute('viewBox').split(' ').map(Number);
+      if(tx+tw>vb[2])tx=mx-tw-10;
+      if(ty<0)ty=my+10;
+
+      var h='<rect x="'+tx+'" y="'+ty+'" width="'+tw+'" height="'+th+'" rx="3" fill="'+bg+'" stroke="'+bd+'" stroke-width="0.5"/>';
+      h+='<text x="'+(tx+6)+'" y="'+(ty+12)+'" font-size="7" font-weight="600" font-family="\'Inter\',sans-serif" fill="'+tc2+'">';
+      h+='x: '+fmtN(xv)+'</text>';
+      h+='<text x="'+(tx+6)+'" y="'+(ty+23)+'" font-size="7" font-weight="600" font-family="\'Inter\',sans-serif" fill="'+tc2+'">';
+      h+='y: '+fmtN(yv)+'</text>';
+      h+='<text x="'+(tx+6)+'" y="'+(ty+34)+'" font-size="7" font-weight="600" font-family="\'Inter\',sans-serif" fill="'+tc2+'">';
+      h+='z: '+fmtN(zv)+'</text>';
+      tip.innerHTML=h;
+      tip.setAttribute('display','block');
+    }
+    function hideTip(){if(tip)tip.setAttribute('display','none');}
 
     // Toggle between 2D static and 3D interactive
     function enter3D(){
@@ -1389,10 +1466,10 @@ for(var si=0;si<svgs.length;si++){(function(S){
     function exit3D(){
       is3D=false;
       cancelAnimationFrame(aId);
+      hideTip();
       S.classList.remove('fp-3d-active');
       gJ.innerHTML='';gJ.setAttribute('display','none');
       gA3.innerHTML='';gA3.setAttribute('display','none');
-      // Restore correct 2D surface based on current theme
       var dk=S.getAttribute('class').indexOf('fp-dark')>=0;
       if(gSD)gSD.setAttribute('display',dk?'block':'none');
       if(gSL)gSL.setAttribute('display',dk?'none':'block');
@@ -1401,12 +1478,11 @@ for(var si=0;si<svgs.length;si++){(function(S){
       if(btnLbl)btnLbl.textContent='3D';
       S.style.cursor='';
     }
-    // Listen for toggle event from the 3D button
     S.addEventListener('fp-toggle3d',function(e){
       if(e.detail&&e.detail.uid===uid){is3D?exit3D():enter3D();}
     });
 
-    // Drag handling (only active in 3D mode)
+    // ── Drag rotation ───────────────────────────────────────────────────
     var drag=false,sX,sY,sAz,sEl,vAz=0,vEl=0,aId=0;
     var vb=S.getAttribute('viewBox').split(' ').map(Number);
 
@@ -1421,40 +1497,103 @@ for(var si=0;si<svgs.length;si++){(function(S){
       var m=svgXY(e);if(!inPA(m[0],m[1]))return;
       drag=true;sX=e.clientX;sY=e.clientY;sAz=az;sEl=el;
       vAz=0;vEl=0;cancelAnimationFrame(aId);
+      hideTip();
       S.style.cursor='grabbing';e.preventDefault();
     });
     document.addEventListener('mousemove',function(e){
       if(!drag)return;
       var pAz=az,pEl=el;
       az=sAz+(e.clientX-sX)*.005;
-      el=Math.max(-1.4,Math.min(1.4,sEl+(e.clientY-sY)*.005));
+      el=Math.max(-1.5,Math.min(1.5,sEl+(e.clientY-sY)*.005));
       vAz=az-pAz;vEl=el-pEl;render();
     });
     document.addEventListener('mouseup',function(){
       if(!drag)return;drag=false;S.style.cursor='grab';
+      // Inertia
       (function m(){if(Math.abs(vAz)<.0002&&Math.abs(vEl)<.0002)return;
-        az+=vAz;el=Math.max(-1.4,Math.min(1.4,el+vEl));
+        az+=vAz;el=Math.max(-1.5,Math.min(1.5,el+vEl));
         vAz*=.92;vEl*=.92;render();aId=requestAnimationFrame(m);})();
     });
 
-    // Touch support
+    // ── Hover tooltip on faces ──────────────────────────────────────────
+    S.addEventListener('mousemove',function(e){
+      if(!is3D||drag)return;
+      var tgt=e.target;
+      if(tgt&&tgt.hasAttribute&&tgt.hasAttribute('data-fi')){
+        var m=svgXY(e);
+        showTip(m[0],m[1],parseInt(tgt.getAttribute('data-fi')));
+      }else{hideTip();}
+    });
+    S.addEventListener('mouseleave',function(){hideTip();});
+
+    // ── Scroll to zoom ──────────────────────────────────────────────────
+    S.addEventListener('wheel',function(e){
+      if(!is3D)return;
+      var m=svgXY(e);if(!inPA(m[0],m[1]))return;
+      e.preventDefault();
+      var d=e.deltaY>0?-0.08:0.08;
+      zoom=Math.max(minZoom,Math.min(maxZoom,zoom+d));
+      render();
+    },{passive:false});
+
+    // ── Double-click to reset view ──────────────────────────────────────
+    S.addEventListener('dblclick',function(e){
+      if(!is3D)return;
+      var m=svgXY(e);if(!inPA(m[0],m[1]))return;
+      e.preventDefault();cancelAnimationFrame(aId);
+      // Animate back to initial view
+      var startAz=az,startEl=el,startZoom=zoom;
+      var tAz=initAz,tEl=initEl,tZoom=1.0;
+      var t0=performance.now(),dur=400;
+      (function anim(now){
+        var p=Math.min(1,(now-t0)/dur);
+        // ease-out cubic
+        var ep=1-Math.pow(1-p,3);
+        az=startAz+(tAz-startAz)*ep;
+        el=startEl+(tEl-startEl)*ep;
+        zoom=startZoom+(tZoom-startZoom)*ep;
+        render();
+        if(p<1)requestAnimationFrame(anim);
+      })(performance.now());
+    });
+
+    // ── Touch: drag + pinch-to-zoom ─────────────────────────────────────
+    var pinch=false,pinchD0=0;
     S.addEventListener('touchstart',function(e){
-      if(!is3D||e.touches.length!==1)return;var t=e.touches[0];
+      if(!is3D)return;
+      if(e.touches.length===2){
+        // Pinch start
+        pinch=true;drag=false;
+        var dx=e.touches[0].clientX-e.touches[1].clientX;
+        var dy=e.touches[0].clientY-e.touches[1].clientY;
+        pinchD0=Math.sqrt(dx*dx+dy*dy);
+        e.preventDefault();return;
+      }
+      if(e.touches.length!==1)return;var t=e.touches[0];
       var m=svgXY(t);if(!inPA(m[0],m[1]))return;
       drag=true;sX=t.clientX;sY=t.clientY;sAz=az;sEl=el;
       vAz=0;vEl=0;cancelAnimationFrame(aId);e.preventDefault();
     },{passive:false});
     document.addEventListener('touchmove',function(e){
+      if(pinch&&e.touches.length===2){
+        var dx=e.touches[0].clientX-e.touches[1].clientX;
+        var dy=e.touches[0].clientY-e.touches[1].clientY;
+        var d=Math.sqrt(dx*dx+dy*dy);
+        var scale=d/pinchD0;
+        zoom=Math.max(minZoom,Math.min(maxZoom,zoom*scale));
+        pinchD0=d;render();e.preventDefault();return;
+      }
       if(!drag||e.touches.length!==1)return;var t=e.touches[0];
       var pAz=az,pEl=el;
       az=sAz+(t.clientX-sX)*.005;
-      el=Math.max(-1.4,Math.min(1.4,sEl+(t.clientY-sY)*.005));
+      el=Math.max(-1.5,Math.min(1.5,sEl+(t.clientY-sY)*.005));
       vAz=az-pAz;vEl=el-pEl;render();e.preventDefault();
     },{passive:false});
-    document.addEventListener('touchend',function(){
+    document.addEventListener('touchend',function(e){
+      if(pinch){pinch=false;return;}
       if(!drag)return;drag=false;
       (function m(){if(Math.abs(vAz)<.0002&&Math.abs(vEl)<.0002)return;
-        az+=vAz;el=Math.max(-1.4,Math.min(1.4,el+vEl));
+        az+=vAz;el=Math.max(-1.5,Math.min(1.5,el+vEl));
         vAz*=.92;vEl*=.92;render();aId=requestAnimationFrame(m);})();
     });
   });
