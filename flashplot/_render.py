@@ -1036,12 +1036,22 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
 
 
     # ── Settings dropdown button (rendered last, on top of everything) ──
-    btn_x = w - 28
-    btn_y = 14
-    panel_w = 148
-    panel_h = 140
-    panel_x = w - panel_w - 8
-    panel_y = btn_y + 22
+    if is_pie_only:
+        btn_x = w - 20
+        btn_y = 8
+        panel_w = 120
+        panel_h = 120
+        chev_scale = 'l4 4 l4 -4'
+        btn_sz = 14
+    else:
+        btn_x = w - 28
+        btn_y = 14
+        panel_w = 148
+        panel_h = 140
+        chev_scale = 'l5 5 l5 -5'
+        btn_sz = 20
+    panel_x = w - panel_w - 6
+    panel_y = btn_y + btn_sz + 2
 
     # Chevron button
     lines.append(f'<g id="fp-cfg-btn-{uid}" cursor="pointer" '
@@ -1050,10 +1060,10 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                  f'var v=p.getAttribute(\'display\')===\'none\';'
                  f'p.setAttribute(\'display\',v?\'block\':\'none\');'
                  f'}})(event)">')
-    lines.append(f'  <rect x="{btn_x - 4:.1f}" y="{btn_y - 4:.1f}" width="20" height="20" rx="4" '
+    lines.append(f'  <rect x="{btn_x - 2:.1f}" y="{btn_y - 2:.1f}" width="{btn_sz}" height="{btn_sz}" rx="3" '
                  f'fill="transparent"/>')
-    lines.append(f'  <path class="fp-cfg-chevron" d="M{btn_x:.1f} {btn_y + 3:.1f} l5 5 l5 -5" fill="none" '
-                 f'stroke="#606060" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>')
+    lines.append(f'  <path class="fp-cfg-chevron" d="M{btn_x:.1f} {btn_y + 2:.1f} {chev_scale}" fill="none" '
+                 f'stroke="#606060" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>')
     lines.append('</g>')
 
     # Settings panel (hidden by default)
@@ -1067,12 +1077,15 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
         ("Legend", f"fp-legend-{uid}", bool(has_legend)),
     ]
 
+    tog_row = 22 if is_pie_only else 28
+    tog_font = 9 if is_pie_only else 10
+    tog_ck = 12 if is_pie_only else 14
     for ti, (label, target_id, enabled) in enumerate(toggle_items):
-        ry = panel_y + 12 + ti * 28
-        check_x = panel_x + 12
+        ry = panel_y + 10 + ti * tog_row
+        check_x = panel_x + 10
         check_y = ry
-        text_x = panel_x + 34
-        text_y = ry + 10
+        text_x = check_x + tog_ck + 8
+        text_y = ry + tog_ck * 0.7
 
         # Legend toggle also adjusts SVG viewBox height
         is_legend_toggle = target_id == f"fp-legend-{uid}"
@@ -1096,28 +1109,29 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                      f'ck.setAttribute(\'opacity\',vis?\'0\':\'1\');'
                      f'{legend_vb_js}'
                      f'}})(event)">')
-        lines.append(f'    <rect class="fp-panel-check-box" x="{check_x:.1f}" y="{check_y:.1f}" width="14" height="14" rx="2" '
+        lines.append(f'    <rect class="fp-panel-check-box" x="{check_x:.1f}" y="{check_y:.1f}" width="{tog_ck}" height="{tog_ck}" rx="2" '
                      f'fill="none" stroke="#494949" stroke-width="0.8"/>')
         opacity = "1" if enabled else "0"
-        lines.append(f'    <path class="fp-ck fp-panel-check-mark" d="M{check_x + 3:.1f} {check_y + 7:.1f} l3 3 l5 -6" '
-                     f'fill="none" stroke="#808080" stroke-width="1.3" stroke-linecap="round" '
+        ck_s = tog_ck / 14  # scale factor relative to default 14px
+        lines.append(f'    <path class="fp-ck fp-panel-check-mark" d="M{check_x + 3 * ck_s:.1f} {check_y + 7 * ck_s:.1f} l{3 * ck_s:.1f} {3 * ck_s:.1f} l{5 * ck_s:.1f} {-6 * ck_s:.1f}" '
+                     f'fill="none" stroke="#808080" stroke-width="1.2" stroke-linecap="round" '
                      f'stroke-linejoin="round" opacity="{opacity}"/>')
-        lines.append(f'    <text class="fp-panel-text" x="{text_x:.1f}" y="{text_y:.1f}" font-size="10" font-weight="500" '
+        lines.append(f'    <text class="fp-panel-text" x="{text_x:.1f}" y="{text_y:.1f}" font-size="{tog_font}" font-weight="500" '
                      f'font-family="\'Inter\',sans-serif" fill="#808080">{label}</text>')
         lines.append('  </g>')
 
     # ── Theme toggle (Dark / Light) ───────────────────────────────────
     # Separator line
-    sep_y = panel_y + 12 + len(toggle_items) * 28
+    sep_y = panel_y + 10 + len(toggle_items) * tog_row
     lines.append(f'  <line x1="{panel_x + 10:.1f}" y1="{sep_y:.1f}" x2="{panel_x + panel_w - 10:.1f}" y2="{sep_y:.1f}" '
                  f'stroke="#2a2a2a" stroke-width="0.5" class="fp-panel-check-box"/>')
 
-    theme_y = sep_y + 8
+    theme_y = sep_y + 6
     # Dark label
-    dark_x = panel_x + 14
-    light_x = panel_x + panel_w / 2 + 4
-    pill_w = panel_w / 2 - 18
-    pill_h = 22
+    dark_x = panel_x + 10
+    light_x = panel_x + panel_w / 2 + 2
+    pill_w = panel_w / 2 - 12
+    pill_h = 18 if is_pie_only else 22
     theme_text_y = theme_y + pill_h / 2  # vertical center of pill
 
     # Theme toggle JS: swaps SVG class, updates parent div bg, toggles pill + surfaces
