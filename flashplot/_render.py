@@ -1055,10 +1055,10 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
 
     # ── Settings dropdown button (rendered last, on top of everything) ──
     if is_pie_only:
-        btn_x = w - 16
+        btn_x = w - 14
         btn_y = 6
-        panel_w = 105
-        panel_h = 100
+        panel_w = 82
+        panel_h = 78
         chev_scale = 'l3 3 l3 -3'
         btn_sz = 10
     else:
@@ -1095,9 +1095,9 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
         ("Legend", f"fp-legend-{uid}", bool(has_legend)),
     ]
 
-    tog_row = 18 if is_pie_only else 28
-    tog_font = 8 if is_pie_only else 10
-    tog_ck = 10 if is_pie_only else 14
+    tog_row = 14 if is_pie_only else 28
+    tog_font = 7 if is_pie_only else 10
+    tog_ck = 8 if is_pie_only else 14
     for ti, (label, target_id, enabled) in enumerate(toggle_items):
         ry = panel_y + 10 + ti * tog_row
         check_x = panel_x + 10
@@ -1146,10 +1146,11 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
 
     theme_y = sep_y + 6
     # Dark label
-    dark_x = panel_x + 10
-    light_x = panel_x + panel_w / 2 + 2
-    pill_w = panel_w / 2 - 12
-    pill_h = 16 if is_pie_only else 22
+    _pill_pad = 6 if is_pie_only else 10
+    dark_x = panel_x + _pill_pad
+    light_x = panel_x + panel_w / 2 + 1
+    pill_w = panel_w / 2 - _pill_pad - 1
+    pill_h = 13 if is_pie_only else 22
     theme_text_y = theme_y + pill_h / 2  # vertical center of pill
 
     # Theme toggle JS: swaps SVG class, updates parent div bg, toggles pill + surfaces
@@ -1185,8 +1186,9 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
     lines.append(f'  <g cursor="pointer" data-mode="dark" onclick="{theme_js}">')
     lines.append(f'    <rect id="fp-theme-dark-{uid}" x="{dark_x:.1f}" y="{theme_y:.1f}" '
                  f'width="{pill_w:.1f}" height="{pill_h}" rx="3" fill="#2a2a2a"/>')
+    _pill_fs = 7 if is_pie_only else 9
     lines.append(f'    <text class="fp-panel-text" x="{dark_x + pill_w / 2:.1f}" y="{theme_text_y:.1f}" '
-                 f'text-anchor="middle" dominant-baseline="central" font-size="9" font-weight="600" '
+                 f'text-anchor="middle" dominant-baseline="central" font-size="{_pill_fs}" font-weight="600" '
                  f'font-family="\'Inter\',sans-serif" fill="#808080">Dark</text>')
     lines.append('  </g>')
 
@@ -1195,7 +1197,7 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
     lines.append(f'    <rect id="fp-theme-light-{uid}" x="{light_x:.1f}" y="{theme_y:.1f}" '
                  f'width="{pill_w:.1f}" height="{pill_h}" rx="3" fill="none"/>')
     lines.append(f'    <text class="fp-panel-text" x="{light_x + pill_w / 2:.1f}" y="{theme_text_y:.1f}" '
-                 f'text-anchor="middle" dominant-baseline="central" font-size="9" font-weight="600" '
+                 f'text-anchor="middle" dominant-baseline="central" font-size="{_pill_fs}" font-weight="600" '
                  f'font-family="\'Inter\',sans-serif" fill="#808080">Light</text>')
     lines.append('  </g>')
 
