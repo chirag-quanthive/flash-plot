@@ -116,15 +116,22 @@ _CSS_ANIMATIONS = """
 
 /* ── Pie chart interactions ─────────────────────────────────────────── */
 @keyframes fp-pieSliceIn {
-  from { opacity: 0; transform: scale(0.85); }
-  to { opacity: 1; transform: scale(1); }
+  0% { opacity: 0; transform: scale(0.3) rotate(-90deg); }
+  60% { opacity: 1; transform: scale(1.06) rotate(4deg); }
+  80% { transform: scale(0.97) rotate(-1deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0deg); }
 }
-.fp-pie-slice { cursor: pointer; transition: opacity 0.25s ease, transform 0.2s ease; transform-origin: var(--fp-pie-cx) var(--fp-pie-cy); }
-.fp-pie-group:hover .fp-pie-slice { opacity: 0.35; }
-.fp-pie-group:hover .fp-pie-slice:hover { opacity: 1; transform: scale(1.03); }
+@keyframes fp-piePop {
+  0% { opacity: 0; transform: translateY(8px) scale(0.5); }
+  70% { opacity: 1; transform: translateY(-2px) scale(1.04); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.fp-pie-slice { cursor: pointer; transition: opacity 0.3s ease, transform 0.25s ease, filter 0.3s ease; transform-origin: var(--fp-pie-cx) var(--fp-pie-cy); }
+.fp-pie-group:hover .fp-pie-slice { opacity: 0.3; filter: saturate(0.4); }
+.fp-pie-group:hover .fp-pie-slice:hover { opacity: 1; transform: scale(1.05); filter: saturate(1) brightness(1.08); }
 .fp-pie-group:hover .fp-pie-slice:hover + .fp-pie-lbl { opacity: 1; }
-.fp-pie-lbl { transition: opacity 0.25s ease; pointer-events: none; }
-.fp-pie-group:hover .fp-pie-lbl { opacity: 0.35; }
+.fp-pie-lbl { transition: opacity 0.3s ease; pointer-events: none; }
+.fp-pie-group:hover .fp-pie-lbl { opacity: 0.25; }
 
 /* ── Hover tooltips ─────────────────────────────────────────────────── */
 .fp-tip { pointer-events: all; }
@@ -899,9 +906,9 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
             for si, s in enumerate(el.slices):
                 anim_style = ""
                 if animate:
-                    delay = T_DATA + si * 0.12
+                    delay = T_DATA + si * 0.15
                     anim_style = (f'--fp-pie-cx:{pie_cx_css};--fp-pie-cy:{pie_cy_css};'
-                                  f'animation:fp-pieSliceIn 0.6s cubic-bezier(0.22,1,0.36,1) {delay:.2f}s both;')
+                                  f'animation:fp-pieSliceIn 0.7s cubic-bezier(0.34,1.56,0.64,1) {delay:.2f}s both;')
 
                 cos_s, sin_s = math.cos(s.start_angle), math.sin(s.start_angle)
                 cos_e, sin_e = math.cos(s.end_angle), math.sin(s.end_angle)
@@ -933,8 +940,8 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                 ly = pcy + label_r * math.sin(s.mid_angle)
                 lbl_anim = ""
                 if animate:
-                    delay = T_DATA + 0.3 + si * 0.12
-                    lbl_anim = f'animation:fp-refFade 0.4s ease {delay:.2f}s both;'
+                    delay = T_DATA + 0.35 + si * 0.15
+                    lbl_anim = f'animation:fp-piePop 0.5s cubic-bezier(0.22,1,0.36,1) {delay:.2f}s both;'
                 fill = theme.background if not el.donut else "#e0e0e0"
                 lines.append(f'<text class="fp-pie-lbl" x="{lx:.1f}" y="{ly:.1f}" text-anchor="middle" '
                              f'dominant-baseline="central" font-size="8" font-weight="600" '
@@ -956,7 +963,7 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
         # For pie charts, fade legend in after pie animation completes
         if is_pie_only and animate:
             n_pie_slices = sum(len(el.slices) for el in sp.elements if isinstance(el, PiePlotElement))
-            leg_delay = T_DATA + max(0, n_pie_slices - 1) * 0.12 + 0.5
+            leg_delay = T_DATA + max(0, n_pie_slices - 1) * 0.15 + 0.6
             lines.append(f'<g id="fp-legend-{uid}" style="opacity:0;animation:fp-refFade 0.5s ease {leg_delay:.2f}s both">')
         else:
             lines.append(f'<g id="fp-legend-{uid}">')
