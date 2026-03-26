@@ -474,7 +474,7 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
         "})(event)"
     )
     if sp.title and sp.title_style:
-        title_top = 18  # top margin
+        title_top = 6 if is_pie_only else 18  # top margin
         ty = title_top + sp.title_style.font_size
         anim_style = ""
         if animate:
@@ -487,7 +487,8 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                      f'fill="{sp.title_style.color}"{anim_style}>{_esc(sp.title)}</text>')
         lines.append('</g>')
     if sp.subtitle and sp.subtitle_style:
-        sy = 18 + (sp.title_style.font_size + 6 if sp.title else 0) + sp.subtitle_style.font_size
+        _sub_top = 6 if is_pie_only else 18
+        sy = _sub_top + (sp.title_style.font_size + 4 if sp.title else 0) + sp.subtitle_style.font_size
         anim_style = ""
         if animate:
             anim_style = f' style="animation:fp-refFade 0.5s ease 0.35s both"'
@@ -948,9 +949,9 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
 
         if is_pie_only:
             # Pie charts: stacked legend right-aligned
-            swatch_sz = 5
-            font_sz = 7
-            row_h = 12
+            swatch_sz = 6
+            font_sz = 8
+            row_h = 14
             n_entries = len(sp.legend.entries)
             total_h = n_entries * row_h
             # Right-align: estimate max label width

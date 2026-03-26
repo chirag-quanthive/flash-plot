@@ -512,11 +512,12 @@ class Axes:
         # Push plot area down when title/subtitle present
         header_h = 0
         if self._title:
-            header_h += self._theme.title_font_size + 6
+            _title_fs = 13 if _is_pie_only else self._theme.title_font_size
+            header_h += _title_fs + 4
         if self._subtitle:
-            header_h += 16
+            header_h += 14
         if header_h > 0:
-            header_h += 14  # gap below header
+            header_h += 6 if _is_pie_only else 14  # gap below header
         if header_h > 0:
             pa = Rect(pa.x, pa.y + header_h, pa.w, pa.h - header_h)
 
@@ -960,13 +961,13 @@ class Axes:
             title=self._title,
             title_style=TextStyle(
                 font_family=self._theme.title_font_family,
-                font_size=self._theme.title_font_size,
+                font_size=13 if _is_pie_only else self._theme.title_font_size,
                 font_weight=400, color=self._theme.title_color,
             ) if self._title else None,
             subtitle=self._subtitle,
             subtitle_style=TextStyle(
                 font_family=self._theme.axis_font_family,
-                font_size=12,
+                font_size=10 if _is_pie_only else 12,
                 font_weight=400, color=self._theme.text_secondary,
             ) if self._subtitle else None,
             x_axis=x_axis, y_axis=y_axis, grid=GridScene(grid_visible, grid_axis, grid_lines),
