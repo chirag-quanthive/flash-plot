@@ -947,18 +947,23 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
         lines.append(f'<g id="fp-legend-{uid}">')
 
         if is_pie_only:
-            # Pie charts: stacked legend on the right side of the pie
-            leg_x = pa.x + pa.w * 0.62
+            # Pie charts: stacked legend right-aligned
+            swatch_sz = 5
+            font_sz = 7
+            row_h = 12
             n_entries = len(sp.legend.entries)
-            row_h = 15
             total_h = n_entries * row_h
+            # Right-align: estimate max label width
+            max_lbl_w = max(len(le.label) for le in sp.legend.entries) * (font_sz * 0.55)
+            leg_right = pa.x + pa.w
+            leg_x = leg_right - max_lbl_w - swatch_sz - 6
             leg_start_y = pa.y + (pa.h - total_h) / 2
             for li, le in enumerate(sp.legend.entries):
                 ly = leg_start_y + li * row_h
-                lines.append(f'  <rect x="{leg_x:.1f}" y="{ly:.1f}" width="7" height="7" rx="1.5" '
+                lines.append(f'  <rect x="{leg_x:.1f}" y="{ly:.1f}" width="{swatch_sz}" height="{swatch_sz}" rx="1" '
                              f'fill="{le.color}"/>')
-                lines.append(f'  <text class="fp-legend-text" x="{leg_x + 12:.1f}" y="{ly + 5.5:.1f}" '
-                             f'font-size="8" font-weight="500" dominant-baseline="central" '
+                lines.append(f'  <text class="fp-legend-text" x="{leg_x + swatch_sz + 5:.1f}" y="{ly + swatch_sz / 2:.1f}" '
+                             f'font-size="{font_sz}" font-weight="500" dominant-baseline="central" '
                              f'font-family="\'Inter\',sans-serif" fill="#808080">{_esc(le.label)}</text>')
         else:
             # Other charts: horizontal legend centered below x-axis

@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from ._core import (
-    Point, Rect, TickMark, TextStyle, Theme, BarGeometry, BarThemeStyle,
+    Point, Rect, Padding, TickMark, TextStyle, Theme, BarGeometry, BarThemeStyle,
     BoxStats, ViolinStats, SurfaceFace,
     get_theme,
     compute_ticks, generate_tick_marks, scale_value,
@@ -502,7 +502,12 @@ class Axes:
     # ── Render ──────────────────────────────────────────────────────────
 
     def _render(self, bounds: Rect) -> SubplotScene:
-        pa = compute_layout(bounds.w, bounds.h)  # plot area relative to (0,0)
+        # Detect pie-only: use tighter padding (no axes needed)
+        _is_pie_only = all(isinstance(c, _PieCmd) for c in self._commands) and len(self._commands) > 0
+        if _is_pie_only:
+            pa = compute_layout(bounds.w, bounds.h, padding=Padding(top=2, right=2, bottom=4, left=4), inset=4)
+        else:
+            pa = compute_layout(bounds.w, bounds.h)  # plot area relative to (0,0)
 
         # Push plot area down when title/subtitle present
         header_h = 0
@@ -916,8 +921,8 @@ class Axes:
                     for i in range(len(cmd.values))
                 ]
                 # Size pie to fit left portion of plot area, legend goes on right
-                pie_r = min(pa.w * 0.22, pa.h * 0.38)
-                pie_cx = pa.x + pa.w * 0.35
+                pie_r = min(pa.w * 0.18, pa.h * 0.36)
+                pie_cx = pa.x + pie_r + 2
                 pie_cy = pa.y + pa.h * 0.5
                 gap = 0.02  # radians gap between slices
                 slices: List[PieSlice] = []
