@@ -422,7 +422,12 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                 _row_w += _iw
         legend_extra_h = 30 + _n_rows * 18
     if is_pie_only:
-        svg_h = pa.y + pa.h + 6  # tight crop for pie charts
+        # Crop SVG to actual pie content: find max bottom of pie elements
+        _pie_bottom = 0
+        for el in sp.elements:
+            if isinstance(el, PiePlotElement):
+                _pie_bottom = max(_pie_bottom, el.cy + el.radius)
+        svg_h = _pie_bottom + 8 if _pie_bottom > 0 else pa.y + pa.h + 6
     else:
         svg_h = h + legend_extra_h
     lines.append(f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w:.1f} {svg_h:.1f}" '
@@ -1040,12 +1045,12 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
 
     # ── Settings dropdown button (rendered last, on top of everything) ──
     if is_pie_only:
-        btn_x = w - 20
-        btn_y = 8
-        panel_w = 120
-        panel_h = 120
-        chev_scale = 'l4 4 l4 -4'
-        btn_sz = 14
+        btn_x = w - 16
+        btn_y = 6
+        panel_w = 105
+        panel_h = 100
+        chev_scale = 'l3 3 l3 -3'
+        btn_sz = 10
     else:
         btn_x = w - 28
         btn_y = 14
@@ -1080,9 +1085,9 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
         ("Legend", f"fp-legend-{uid}", bool(has_legend)),
     ]
 
-    tog_row = 22 if is_pie_only else 28
-    tog_font = 9 if is_pie_only else 10
-    tog_ck = 12 if is_pie_only else 14
+    tog_row = 18 if is_pie_only else 28
+    tog_font = 8 if is_pie_only else 10
+    tog_ck = 10 if is_pie_only else 14
     for ti, (label, target_id, enabled) in enumerate(toggle_items):
         ry = panel_y + 10 + ti * tog_row
         check_x = panel_x + 10
@@ -1134,7 +1139,7 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
     dark_x = panel_x + 10
     light_x = panel_x + panel_w / 2 + 2
     pill_w = panel_w / 2 - 12
-    pill_h = 18 if is_pie_only else 22
+    pill_h = 16 if is_pie_only else 22
     theme_text_y = theme_y + pill_h / 2  # vertical center of pill
 
     # Theme toggle JS: swaps SVG class, updates parent div bg, toggles pill + surfaces
