@@ -924,7 +924,7 @@ class Axes:
                 # Size pie to fit left portion of plot area, legend goes on right
                 pie_r = min(pa.w * 0.20, pa.h * 0.46)
                 pie_cx = pa.x + pie_r + 2
-                pie_cy = pa.y + pa.h * 0.5
+                pie_cy = pa.y + pa.h * 0.42
                 gap = 0.02  # radians gap between slices
                 slices: List[PieSlice] = []
                 angle = -math.pi / 2  # start from top

@@ -966,7 +966,7 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
             max_lbl_w = max(len(le.label) for le in sp.legend.entries) * (font_sz * 0.55)
             leg_right = pa.x + pa.w
             leg_x = leg_right - max_lbl_w - swatch_sz - 6
-            leg_start_y = pa.y + (pa.h - total_h) / 2
+            leg_start_y = pa.y + (pa.h - total_h) * 0.35
             for li, le in enumerate(sp.legend.entries):
                 ly = leg_start_y + li * row_h
                 lines.append(f'  <rect x="{leg_x:.1f}" y="{ly:.1f}" width="{swatch_sz}" height="{swatch_sz}" rx="1" '
