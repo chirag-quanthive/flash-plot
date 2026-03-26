@@ -505,19 +505,18 @@ class Axes:
         # Detect pie-only: use tighter padding (no axes needed)
         _is_pie_only = all(isinstance(c, _PieCmd) for c in self._commands) and len(self._commands) > 0
         if _is_pie_only:
-            pa = compute_layout(bounds.w, bounds.h, padding=Padding(top=2, right=8, bottom=4, left=10), inset=4)
+            pa = compute_layout(bounds.w, bounds.h, padding=Padding(top=4, right=4, bottom=8, left=8), inset=8)
         else:
             pa = compute_layout(bounds.w, bounds.h)  # plot area relative to (0,0)
 
         # Push plot area down when title/subtitle present
         header_h = 0
         if self._title:
-            _title_fs = 11 if _is_pie_only else self._theme.title_font_size
-            header_h += _title_fs + 4
+            header_h += self._theme.title_font_size + 4
         if self._subtitle:
             header_h += 14
         if header_h > 0:
-            header_h += 2 if _is_pie_only else 14  # gap below header
+            header_h += 10  # gap below header
         if header_h > 0:
             pa = Rect(pa.x, pa.y + header_h, pa.w, pa.h - header_h)
 
@@ -961,13 +960,13 @@ class Axes:
             title=self._title,
             title_style=TextStyle(
                 font_family=self._theme.title_font_family,
-                font_size=11 if _is_pie_only else self._theme.title_font_size,
+                font_size=self._theme.title_font_size,
                 font_weight=400, color=self._theme.title_color,
             ) if self._title else None,
             subtitle=self._subtitle,
             subtitle_style=TextStyle(
                 font_family=self._theme.axis_font_family,
-                font_size=8.5 if _is_pie_only else 12,
+                font_size=12,
                 font_weight=400, color=self._theme.text_secondary,
             ) if self._subtitle else None,
             x_axis=x_axis, y_axis=y_axis, grid=GridScene(grid_visible, grid_axis, grid_lines),
