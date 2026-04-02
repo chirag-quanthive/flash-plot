@@ -107,43 +107,60 @@ const EXAMPLES: Record<string, string> = {
     },
   }, null, 2),
 
-  candlestick: JSON.stringify({
-    type: "candlestick",
-    title: "NVDA Price Action",
-    subtitle: "Daily OHLC",
-    series: [{
-      data: [130, 135, 128, 140, 138, 145, 142, 150, 147, 155],
-      open: [125, 130, 136, 127, 141, 137, 146, 141, 151, 146],
-      high: [132, 137, 138, 142, 143, 147, 148, 152, 153, 157],
-      low: [123, 128, 126, 125, 136, 135, 140, 139, 145, 144],
-      close: [130, 135, 128, 140, 138, 145, 142, 150, 147, 155],
-    }],
-    xLabels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Mon", "Tue", "Wed", "Thu", "Fri"],
-  }, null, 2),
-
-  waterfall: JSON.stringify({
-    type: "waterfall",
-    title: "P&L Bridge",
-    subtitle: "Quarterly revenue breakdown ($M)",
-    series: [{ data: [50, 12, -8, 25, -15, 5, -3, 18], label: "Revenue" }],
-    xLabels: ["Base", "Sales", "Churn", "Upsell", "Refunds", "Services", "Costs", "Growth"],
+  "stacked bar": JSON.stringify({
+    type: "stacked_bar",
+    title: "Revenue by Region",
+    subtitle: "Quarterly breakdown ($M)",
+    series: [
+      { data: [45, 52, 48, 60], label: "North America", color: "#EF8CFF" },
+      { data: [30, 28, 35, 32], label: "Europe", color: "#8CA5FF" },
+      { data: [18, 22, 20, 25], label: "Asia Pacific", color: "#4ECDC4" },
+    ],
+    xLabels: ["Q1", "Q2", "Q3", "Q4"],
     grid: true,
   }, null, 2),
 
-  heatmap: JSON.stringify({
-    type: "heatmap",
-    title: "Correlation Matrix",
-    heatmap: {
-      data: [
-        [1.0, 0.85, 0.32, -0.15, 0.45],
-        [0.85, 1.0, 0.28, -0.22, 0.38],
-        [0.32, 0.28, 1.0, 0.65, -0.12],
-        [-0.15, -0.22, 0.65, 1.0, -0.35],
-        [0.45, 0.38, -0.12, -0.35, 1.0],
-      ],
-      rowLabels: ["SPY", "QQQ", "GLD", "TLT", "VIX"],
-      colLabels: ["SPY", "QQQ", "GLD", "TLT", "VIX"],
-    },
+  bubble: JSON.stringify({
+    type: "bubble",
+    title: "Market Cap vs Volume",
+    subtitle: "Bubble size = revenue ($B)",
+    series: [
+      {
+        data: [15.2, 8.4, 22.1, 5.8, 18.5, 12.3, 28.4, 9.1],
+        x: [120, 45, 280, 30, 190, 85, 350, 55],
+        sizes: [12, 5, 18, 3, 14, 8, 22, 4],
+        label: "Tech Stocks",
+        color: "#4ECDC4",
+        markerSize: 6,
+      },
+    ],
+    grid: true,
+  }, null, 2),
+
+  violin: JSON.stringify({
+    type: "violin",
+    title: "Return Distributions by Strategy",
+    subtitle: "Daily returns comparison",
+    series: [
+      { data: [-2.1, -1.5, -0.8, -0.3, 0.1, 0.4, 0.7, 1.2, 1.8, 2.5, 0.3, -0.5, 0.9, 1.4, -1.1, 0.6, -0.2, 1.0, 0.2, -0.7, 1.6, -1.3, 0.5, 0.8, -0.4], label: "Momentum", color: "#C084FC" },
+      { data: [0.1, 0.3, -0.1, 0.5, -0.3, 0.2, 0.4, -0.2, 0.6, -0.4, 0.3, 0.1, -0.1, 0.2, 0.5, -0.3, 0.4, 0.1, -0.2, 0.3, 0.2, -0.1, 0.4, 0.1, 0.3], label: "Market Neutral", color: "#4ECDC4" },
+    ],
+    bins: 15,
+    grid: true,
+  }, null, 2),
+
+  boxplot: JSON.stringify({
+    type: "boxplot",
+    title: "Quarterly Returns",
+    subtitle: "Box-and-whisker summary",
+    series: [
+      { q1: 2.5, median: 5.8, q3: 9.2, whiskerLow: -1.5, whiskerHigh: 14.8, outliers: [-5.2, 18.1], label: "Q1" },
+      { q1: 1.8, median: 4.2, q3: 7.5, whiskerLow: -3.2, whiskerHigh: 12.1, outliers: [-6.8], label: "Q2" },
+      { q1: 3.1, median: 6.5, q3: 10.8, whiskerLow: -0.5, whiskerHigh: 16.2, outliers: [20.5], label: "Q3" },
+      { q1: 0.8, median: 3.5, q3: 6.2, whiskerLow: -4.1, whiskerHigh: 10.5, outliers: [-7.2, 15.8], label: "Q4" },
+    ],
+    xLabels: ["Q1", "Q2", "Q3", "Q4"],
+    grid: true,
   }, null, 2),
 };
 
