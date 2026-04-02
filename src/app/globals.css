@@ -1,0 +1,398 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: #121212;
+  --color-foreground: #f2f2f2;
+  --color-surface: #0f0f0f;
+  --color-surface-raised: #1c1c1c;
+  --color-surface-active: #272727;
+  --color-border: #1c2029;
+  --color-border-subtle: #1b1b1b;
+  --color-border-input: #303030;
+  --color-border-chip: #252525;
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #8f8f8f;
+  --color-text-muted: #747474;
+  --color-text-placeholder: #505050;
+  --color-text-label: #4f4f4f;
+  --color-text-chip: #8e8e8e;
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-serif: "Times New Roman", "Georgia", serif;
+  --font-display: "Power Grotesk", "Inter", system-ui, sans-serif;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2a2a2a transparent;
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+  overflow: hidden;
+}
+
+.hide-scrollbar {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+@keyframes tickerFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes promptShadowIn {
+  from {
+    box-shadow: 0 0 0 rgba(0,0,0,0);
+  }
+  to {
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 60px rgba(0,0,0,0.15);
+  }
+}
+
+@keyframes earthSpin {
+  from {
+    transform: translate(-50%, 0) rotate(0deg);
+  }
+  to {
+    transform: translate(-50%, 0) rotate(360deg);
+  }
+}
+
+@keyframes highlightExpand {
+  from {
+    background-size: 0% 85%;
+  }
+  to {
+    background-size: 100% 85%;
+  }
+}
+
+@keyframes partitionSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes placeholderFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes selectorSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes selectorSlideDown {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* ── Think Blob ─────────────────────────────────────────────────────── */
+
+/* Outer shell: organic shape morph + subtle breathing */
+@keyframes blobBreath {
+  0%, 100% { transform: scale(1);    border-radius: 50%; }
+  25%       { transform: scale(1.05); border-radius: 47% 53% 55% 45% / 53% 45% 55% 47%; }
+  50%       { transform: scale(0.98); border-radius: 54% 46% 43% 57% / 46% 58% 42% 54%; }
+  75%       { transform: scale(1.04); border-radius: 43% 57% 52% 48% / 55% 44% 56% 45%; }
+}
+
+/* Outer teal glow pulse — slow heartbeat feel */
+@keyframes blobGlow {
+  0%, 100% { box-shadow: 0 0 12px 3px rgba(78,205,196,0.25), 0 0 25px 6px rgba(78,205,196,0.08); }
+  50%       { box-shadow: 0 0 20px 7px rgba(78,205,196,0.45), 0 0 40px 12px rgba(78,205,196,0.18); }
+}
+
+/* Gentle vertical float */
+@keyframes blobFloat {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-3px); }
+}
+
+/* Single slow CW rotation — barely perceptible background drift */
+@keyframes blobDrift {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* Inner light swell — the "thinking" pulse, centered */
+@keyframes blobInnerLight {
+  0%, 100% { transform: scale(0.65); opacity: 0.35; }
+  40%       { transform: scale(1.15); opacity: 0.80; }
+  70%       { transform: scale(0.90); opacity: 0.55; }
+}
+
+/* Dark vignette counter-pulse — breathes opposite to light */
+@keyframes blobVignette {
+  0%, 100% { opacity: 0.60; }
+  40%       { opacity: 0.20; }
+  70%       { opacity: 0.50; }
+}
+
+/* Highlight wander — slow organic drift not a constant spin */
+@keyframes blobHighlight {
+  0%        { transform: rotate(0deg); }
+  30%       { transform: rotate(55deg); }
+  60%       { transform: rotate(-30deg); }
+  100%      { transform: rotate(0deg); }
+}
+
+/* Shimmer — softer, slower flash */
+@keyframes blobShimmer {
+  0%   { transform: translateX(-35px); opacity: 0; }
+  20%  { opacity: 0.55; }
+  80%  { opacity: 0.35; }
+  100% { transform: translateX(45px); opacity: 0; }
+}
+
+/* Entrance — spring bounce in */
+@keyframes blobEnter {
+  0%   { opacity: 0; transform: scale(0.15) translateY(8px); }
+  55%  { opacity: 1; transform: scale(1.12) translateY(-1px); }
+  78%  { transform: scale(0.95) translateY(0.5px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* Exit — soft fade out */
+@keyframes blobExit {
+  from { opacity: 1; transform: scale(1) translateY(0); }
+  to   { opacity: 0; transform: scale(0.25) translateY(5px); }
+}
+
+/* ── Ask Flash ─────────────────────────────────────────────────────── */
+
+.ask-flash-selectable::selection,
+.ask-flash-selectable *::selection {
+  background: rgba(162, 206, 239, 0.35);
+  color: inherit;
+}
+
+@keyframes askFlashPopupIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(4px) scale(0.92); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+
+@keyframes askFlashChipIn {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* ── My Backtests Overlay ──────────────────────────────────────────── */
+
+@keyframes backtestsIn {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes backtestsOut {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+}
+
+@keyframes backtestsFolderIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Calendar Dropdown ──────────────────────────────────────────────── */
+
+@keyframes calendarIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(-6px);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: blur(0px);
+  }
+}
+
+@keyframes calendarBackdropIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes liquidPillIn {
+  0% {
+    opacity: 0;
+    transform: translateX(40px) scaleX(0.92) scaleY(1.03);
+    filter: blur(3px);
+  }
+  50% {
+    opacity: 1;
+    transform: translateX(-2px) scaleX(1.015) scaleY(0.985);
+    filter: blur(0px);
+  }
+  75% {
+    transform: translateX(0.5px) scaleX(0.995) scaleY(1.005);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scaleX(1) scaleY(1);
+    filter: blur(0px);
+  }
+}
+
+@keyframes liquidPillOut {
+  0% {
+    opacity: 1;
+    transform: translateX(0) scaleX(1) scaleY(1);
+    filter: blur(0px);
+  }
+  25% {
+    opacity: 1;
+    transform: translateX(-3px) scaleX(1.02) scaleY(0.98);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(40px) scaleX(0.92) scaleY(1.03);
+    filter: blur(3px);
+  }
+}
+
+@keyframes calendarPanelOut {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: blur(0px);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.96) translateY(-4px);
+    filter: blur(3px);
+  }
+}
+
+@keyframes calendarBackdropOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* ── Graph Type Selector Dropdown ─────────────────────────────────────── */
+
+@keyframes graphSelectorIn {
+  from { opacity: 0; transform: scale(0.92) translateY(-4px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes graphSelectorOut {
+  from { opacity: 1; transform: scale(1) translateY(0); }
+  to   { opacity: 0; transform: scale(0.92) translateY(-4px); }
+}
+
+@keyframes graphSelectorBackdropIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes graphSelectorBackdropOut {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+/* ── Graph skeleton shimmer ──────────────────────────────────────────── */
+
+@keyframes graphShimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+@keyframes sparkleFloat1 {
+  0%, 100% { transform: translate(0, 0); opacity: 0.85; }
+  35% { transform: translate(0.5px, -0.8px); opacity: 1; }
+  65% { transform: translate(-0.3px, -1.2px); opacity: 0.7; }
+  85% { transform: translate(0.4px, -0.4px); opacity: 0.95; }
+}
+@keyframes sparkleFloat2 {
+  0%, 100% { transform: translate(0, 0); opacity: 0.8; }
+  30% { transform: translate(-0.6px, -1px); opacity: 1; }
+  60% { transform: translate(0.4px, -1.5px); opacity: 0.65; }
+  80% { transform: translate(-0.2px, -0.5px); opacity: 0.9; }
+}
+@keyframes sparkleFloat3 {
+  0%, 100% { transform: translate(0, 0); opacity: 0.9; }
+  25% { transform: translate(0.3px, -1.2px); opacity: 0.7; }
+  50% { transform: translate(-0.5px, -0.6px); opacity: 1; }
+  75% { transform: translate(0.4px, -1px); opacity: 0.75; }
+}
+@keyframes glowDrift1 {
+  0%, 100% { transform: translate(0, 0); }
+  30% { transform: translate(0.5px, -0.4px); }
+  60% { transform: translate(-0.4px, 0.5px); }
+  80% { transform: translate(0.3px, 0.2px); }
+}
+@keyframes glowDrift2 {
+  0%, 100% { transform: translate(0, 0); }
+  35% { transform: translate(-0.4px, 0.4px); }
+  65% { transform: translate(0.5px, -0.3px); }
+  85% { transform: translate(-0.2px, -0.4px); }
+}
+@keyframes glowDrift3 {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(0.2px, 0.5px); }
+  55% { transform: translate(-0.5px, -0.2px); }
+  80% { transform: translate(0.4px, -0.4px); }
+}
+
