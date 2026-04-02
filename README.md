@@ -1,58 +1,28 @@
-# Flash Plot
+# Flash Plot -- Charting Engine
 
-Premium dark-themed charting engine with a matplotlib-like API. Renders animated SVG charts with CSS keyframe animations, multi-layer bar glow effects, and a financial-grade dark theme.
+Premium dark-themed charting engine powering Flash 2.0. Renders animated SVG charts with multi-layer bar glow effects, sparkle animations, and a financial-grade dark theme.
 
-Available as a **TypeScript/React** library (with MCP + HTTP API) and a **pure Python** package for Google Colab / Jupyter.
-
-![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue.svg)
-![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
-
----
-
-## Table of Contents
-
-- [Installation](#installation)
-- [Quick Start](#quick-start)
-- [Supported Chart Types](#supported-chart-types)
-- [Python API Reference](#python-api-reference)
-- [TypeScript API Reference](#typescript-api-reference)
-- [MCP Server (AI Agent Integration)](#mcp-server-ai-agent-integration)
-  - [Tool: chart_render](#tool-chart_render)
-  - [Tool: chart_resolve_type](#tool-chart_resolve_type)
-  - [Tool: chart_get_styles](#tool-chart_get_styles)
-- [ChartSpec JSON Schema](#chartspec-json-schema)
-- [HTTP API](#http-api)
-- [Scene Graph Output](#scene-graph-output)
-- [Architecture](#architecture)
-- [Theme & Color Palettes](#theme--color-palettes)
-- [Animation System](#animation-system)
-- [Requirements](#requirements)
-
----
-
-## Installation
-
-### Python (Colab / Jupyter) — no server needed
-
-```bash
-pip install git+https://github.com/quant-hive/ChartingEngine.git#subdirectory=python
-```
-
-### TypeScript (Next.js / React)
-
-```bash
-git clone https://github.com/quant-hive/ChartingEngine.git
-cd ChartingEngine
-npm install
-npm run dev        # Dev server on localhost:3000
-```
+Available as a **TypeScript/React** library (with MCP + HTTP API) and a **pure Python** package for Google Colab / Jupyter. Both produce visually identical output.
 
 ---
 
 ## Quick Start
 
-### Python
+### TypeScript (Next.js)
+
+```bash
+git clone https://github.com/quant-hive/ChartingEngine.git
+cd ChartingEngine
+npm install
+npm run dev
+# Open http://localhost:3000/test2
+```
+
+### Python (Colab / Jupyter)
+
+```bash
+pip install git+https://github.com/quant-hive/ChartingEngine.git#subdirectory=python
+```
 
 ```python
 from flash_plot import FlashPlot
@@ -60,200 +30,232 @@ from flash_plot import FlashPlot
 fig = FlashPlot()
 fig.set_title("Cumulative Returns")
 fig.set_subtitle("Strategy vs Benchmark")
-fig.plot([0, 5, -8, 15, 10, 25, 18, 55, 35, 80], color="#d4d4d4", label="Strategy")
-fig.plot([5, 8, 10, 12, 15, 14, 16, 18, 15, 20], color="#707070", label="Benchmark")
-fig.set_xticks(["Jan", "Mar", "May", "Jul", "Sep"])
+fig.plot([0, 5, 12, 8, 18, 25], label="Strategy")
+fig.plot([0, 3, 6, 4, 10, 14], label="Benchmark")
 fig.grid(True)
 fig.legend()
-fig.show()  # renders inline SVG in Jupyter/Colab
-```
-
-### TypeScript (Figure/Axes API)
-
-```typescript
-import { figure, FlashChart } from "./lib/plot";
-
-const fig = figure();
-const ax = fig.subplot(1, 1, 1);
-ax.plot([0, 5, 12, 8, 18, 25], { color: "#d4d4d4", label: "Strategy" });
-ax.plot([5, 8, 10, 12, 15], { color: "#707070", label: "Benchmark" });
-ax.set_xticks(["Jan", "Feb", "Mar", "Apr", "May"]);
-ax.grid(true);
-ax.legend();
-const scene = fig.render();
-
-// In React:
-<FlashChart scene={scene} />
-```
-
-### TypeScript (ChartSpec → Scene)
-
-```typescript
-import { renderChart } from "./lib/plot";
-
-const scene = renderChart({
-  type: "line",
-  title: "Strategy vs Benchmark",
-  series: [
-    { data: [0, 5, 12, 8, 18], label: "Strategy", color: "#d4d4d4" },
-    { data: [0, 3, 6, 5, 9], label: "Benchmark", color: "#707070" },
-  ],
-  xLabels: ["Jan", "Feb", "Mar", "Apr", "May"],
-  grid: true,
-});
+fig.show()
 ```
 
 ---
 
 ## Supported Chart Types
 
-| Type | Key | Description |
-|------|-----|-------------|
-| Line | `line` | Time series, trends, multi-line comparison |
-| Bar | `bar` | Categorical comparison, grouped bars |
-| Stacked Bar | `stacked_bar` | Composition over categories |
-| Area | `area` | Cumulative values, filled line chart |
-| Scatter | `scatter` | Correlation, clusters, risk-return |
-| Bubble | `bubble` | Scatter with variable-size points |
-| Histogram | `histogram` | Distribution, frequency |
-| Pie | `pie` | Proportional breakdown |
-| Donut | `donut` | Pie with center cutout |
-| Candlestick | `candlestick` | OHLC price action |
-| Surface 3D | `surface_3d` | Volatility surfaces, 3D data (WebGL) |
-| Heatmap | `heatmap` | Correlation matrices, 2D grids |
-| Waterfall | `waterfall` | Cumulative contribution, bridges |
-| Violin | `violin` | Distribution shape comparison |
-| Boxplot | `boxplot` | Statistical summary (quartiles, outliers) |
+| Type | Description | Component |
+|------|-------------|-----------|
+| `line` | Time series and trends | FlashChart |
+| `bar` | Categorical comparisons | FlashChart |
+| `stacked_bar` | Part-of-whole across categories | FlashChart |
+| `scatter` | Correlation between two variables | FlashChart |
+| `bubble` | Scatter with variable-size markers | FlashChart |
+| `area` | Filled line chart for volume/magnitude | FlashChart |
+| `histogram` | Frequency distribution | FlashChart |
+| `pie` | Proportional breakdown | PieChart |
+| `donut` | Pie with hollow center | PieChart |
+| `surface_3d` | Interactive 3D surface with rotation/zoom | Surface3D |
+| `candlestick` | OHLC price data | FlashChart |
+| `heatmap` | Color-mapped 2D grid | FlashChart |
+| `waterfall` | Cumulative contributions | FlashChart |
+| `violin` | Distribution shape (KDE) | FlashChart |
+| `boxplot` | Quartile summary statistics | FlashChart |
 
 ---
 
-## Python API Reference
+## Architecture
 
-### `FlashPlot(width=595, height=280)`
+```
+ChartSpec JSON -----> renderChart() -----> Scene Graph -----> FlashChart (React/SVG)
+                                                       |----> renderSceneToSvg() (static SVG)
+                                                       |----> PieChart (pie/donut)
+                                                       |----> Surface3D (3D surface)
 
-Create a new chart figure.
-
-### Plotting Methods
-
-```python
-fig.plot(y_data, x=None, color=None, label=None, line_width=1.5,
-         line_style="solid", alpha=1.0, fill_opacity=None)
-
-fig.bar(x_labels, y_data, color=None, label=None, alpha=1.0)
-
-fig.scatter(x_data, y_data, color=None, label=None, size=4, alpha=1.0)
-
-fig.hist(data, bins=10, color=None, label=None, alpha=1.0)
-
-fig.fill_between(x, y1, y2=0, color=None, alpha=0.15, label=None)
-
-fig.axhline(y, color="#707070", line_width=1, line_style="dashed")
-fig.axvline(x, color="#707070", line_width=1, line_style="dashed")
-
-fig.text(x, y, content, color="#d4d4d4", font_size=10, anchor="start")
-fig.annotate(text, xy, xytext=None, color="#d4d4d4", font_size=9, arrow_color="#707070")
+Python FlashPlot -----> SVG string (Colab-compatible, visually identical)
 ```
 
-### Configuration Methods
+### Data Flow
 
-```python
-fig.set_title("Chart Title")
-fig.set_subtitle("Subtitle text")
-fig.set_xticks(["Q1", "Q2", "Q3", "Q4"])  # string or numeric
-fig.set_yticks([0, 25, 50, 75, 100])
-fig.grid(True)
-fig.legend()
+1. **Input**: `ChartSpec` JSON (from agent, API, or code)
+2. **Processing**: `renderChart()` creates a Scene graph with computed layout, tick positions, element geometry
+3. **Rendering**: Scene graph feeds into:
+   - `FlashChart` -- React component with CSS animations, glow effects, tooltips, scrollable bars
+   - `renderSceneToSvg()` -- Static SVG string for server-side rendering
+   - Python `FlashPlot` -- Direct SVG rendering with identical visual output
+
+### File Structure
+
 ```
-
-### Output
-
-```python
-fig.show()           # Display inline in Jupyter/Colab
-svg = fig.render()   # Get SVG string
-fig                  # Auto-renders in Jupyter (via _repr_html_)
-```
-
----
-
-## TypeScript API Reference
-
-### Figure/Axes API (matplotlib-like)
-
-```typescript
-import { figure } from "./lib/plot";
-
-const fig = figure();
-fig.set_size(800, 400);
-
-const ax = fig.subplot(nrows, ncols, index);
-
-ax.plot(yData, options?)           // Line chart
-ax.bar(xLabels, yData, options?)   // Bar chart
-ax.scatter(xData, yData, options?) // Scatter plot
-ax.hist(data, options?)            // Histogram
-ax.fill_between(xData, y1, y2, options?) // Area fill
-
-ax.axhline(y, options?)            // Horizontal reference
-ax.axvline(x, options?)            // Vertical reference
-ax.text(x, y, content, options?)   // Text annotation
-ax.annotate(text, xy, options?)    // Annotation with arrow
-
-ax.set_title("Title")
-ax.set_subtitle("Subtitle")
-ax.set_xticks(labels)
-ax.set_yticks(values)
-ax.set_xscale("log")              // "linear" | "log"
-ax.set_yscale("log")
-ax.set_xlim(min, max)
-ax.set_ylim(min, max)
-ax.grid(true)
-ax.legend()
-
-const scene = fig.render();        // → Scene graph
-```
-
-### React Components
-
-```tsx
-import { FlashChart, PieChart, Surface3D } from "./lib/plot";
-
-<FlashChart scene={scene} />
-
-<PieChart
-  data={[
-    { label: "Equities", value: 60, color: "#4aaaba" },
-    { label: "Bonds", value: 30, color: "#d8b4fe" },
-    { label: "Cash", value: 10, color: "#fbbf24" },
-  ]}
-  donut={true}
-  donutRatio={0.55}
-  showLegend={true}
-/>
-
-<Surface3D z={zMatrix} wireframe={true} />
-```
-
-### ChartSpec Rendering (declarative)
-
-```typescript
-import { renderChart } from "./lib/plot";
-
-const scene = renderChart(chartSpec);  // ChartSpec → Scene
+src/
+  lib/plot/
+    core/
+      figure.ts        # Figure/Axes classes (matplotlib-like API)
+      renderChart.ts    # ChartSpec -> Scene graph (universal renderer)
+      types.ts          # All TypeScript type definitions
+      theme.ts          # FLASH_DARK theme (colors, fonts, sizes)
+      layout.ts         # Layout computation (padding, plot area)
+      scales.ts         # Axis scaling (linear, log, symlog)
+      paths.ts          # SVG path builders
+    react/
+      FlashChart.tsx    # Main React renderer (animated SVG)
+      PieChart.tsx      # Pie/donut component
+      Surface3D.tsx     # Interactive 3D surface
+      useAnimation.ts   # Animation hooks
+    server/
+      renderSvg.ts      # Scene -> static SVG string
+  lib/
+    chartEngine.tsx     # ChartCard, ChartHeader, ChartSettingsDropdown
+    graphApi.ts         # Mock data API
+  mcp/
+    server.ts           # MCP server (stdio transport, 3 tools)
+    tools/
+      chartRender.ts    # chart_render tool implementation
+      chartResolve.ts   # chart_resolve_type tool implementation
+      chartStyles.ts    # chart_get_styles tool implementation
+  app/
+    api/chart/
+      route.ts          # POST /api/chart (matplotlib commands -> SVG)
+      render/route.ts   # POST /api/chart/render (ChartSpec -> Scene/SVG)
+    test2/page.tsx      # Interactive MCP test playground
+    test/page.tsx       # Matplotlib-style API demo (14 chart examples)
+python/
+  flash_plot/
+    engine.py           # Pure Python SVG renderer (Colab-compatible)
+    __init__.py
+  setup.py
+notebooks/
+  flash_plot_demo.ipynb # 7 demo charts for Colab
 ```
 
 ---
 
-## MCP Server (AI Agent Integration)
+## FLASH_DARK Theme
 
-The charting engine runs as an MCP (Model Context Protocol) server, exposing 3 tools for AI agents. Uses stdio transport for Claude Code integration.
+All values are defined in `src/lib/plot/core/theme.ts` and replicated exactly in `python/flash_plot/engine.py`.
 
-### Starting the MCP Server
+| Token | Value |
+|-------|-------|
+| Background | `#121212` |
+| Surface | `#0f0f0f` |
+| Text primary | `#ffffff` |
+| Text secondary | `#8f8f8f` |
+| Text muted / axis | `#494949` |
+| Grid color | `#2a2a2a` |
+| Grid width | `0.3` |
+| Title font | `'EB Garamond', 'Times New Roman', Georgia, serif` |
+| Title size | `18px`, weight `400`, spacing `-0.2px` |
+| Subtitle font | `'Inter', sans-serif` |
+| Subtitle size | `11px`, weight `400`, spacing `-0.1px`, color `#555555` |
+| Axis font | `'Inter', sans-serif` |
+| Axis size | `10px`, weight `500`, spacing `-0.12px` |
+| Legend font | `'Inter', sans-serif`, `11px` |
+| Legend text color | `#8f8f8f` |
 
-```bash
-npx tsx src/mcp/server.ts
+### Bar Glow Styles
+
+Each bar series uses a themed style with gradient fill and multi-layer glow effects:
+
+| Property | Series 0 (Pink) | Series 1 (Blue) |
+|----------|-----------------|-----------------|
+| Fill | `#EF8CFF` | `#8CA5FF` |
+| Gradient top | `#e586fa` | `#86bafa` |
+| Gradient bottom | `#884f94` | `#4f7194` |
+| Side glow | `#624096` | `#405A96` |
+| Top glow | `#763AA4` | `#3A5FA4` |
+| Bottom glow | `#7B42DD` | `#427BDD` |
+| Left edge | `#7432E6` | `#3268E6` |
+| Sparkle | `#E49BFF` | `#9BB6FF` |
+| Default fill (dark base) | `#1e1f24` | `#1e1f24` |
+
+### Color Palettes by Chart Type
+
+```json
+{
+  "line":      ["#d4d4d4", "#707070", "#4ECDC4", "#FFD93D", "#FF6B6B", "#C084FC", "#67E8F9", "#FCA5A5"],
+  "bar":       ["#EF8CFF", "#8CA5FF", "#4ECDC4", "#FFD93D", "#FF6B6B", "#C084FC"],
+  "scatter":   ["#4ECDC4", "#FFD93D", "#FF6B6B", "#C084FC", "#67E8F9", "#d4d4d4"],
+  "area":      ["#4ECDC4", "#C084FC", "#FFD93D", "#FF6B6B", "#67E8F9", "#d4d4d4"],
+  "histogram": ["#C084FC", "#4ECDC4", "#FFD93D"],
+  "pie":       ["#4aaaba", "#d8b4fe", "#fbbf24", "#f9a8d4", "#6dd5c8", "#a5f3d8", "#C084FC", "#FF6B6B", "#67E8F9", "#FFD93D"]
+}
 ```
 
-### `.mcp.json` Configuration
+### Layout Constants
+
+```
+Width: 595 (default)    Height: 260 (default)
+Padding: { top: 4, right: 16, bottom: 28, left: 32 }
+Inset: 16
+Plot area: x = left + inset, y = top + inset, w = width - left - right - 2*inset, h = height - top - bottom - 2*inset
+```
+
+---
+
+## Bar Glow Effect (Frontend)
+
+The FlashChart React component renders bars with a 9-layer glow stack:
+
+1. **Dark base rect** (`#1e1f24`) -- grows from bottom via `scaleY` animation
+2. **Colored fill** (e.g. `#EF8CFF`) -- main bar color
+3. **Side glow** -- curved SVG path along right edge, Gaussian blur (`sigma: 5`), CSS drift animation
+4. **Top highlight** -- bright rectangle at top, blur (`sigma: 4`), drift animation
+5. **Bottom glow** -- curved path at base, blur (`sigma: 5`), drift animation
+6. **Left edge** -- thin edge highlight, blur (`sigma: 5`), drift animation
+7. **Sparkle dots** -- 15 positioned dots with float animation (3 patterns, staggered)
+8. **Bottom white** -- white wedge at base, blur (`sigma: 2.25`)
+9. **Top white** -- white wedge at top, blur (`sigma: 2.25`)
+
+All layers are clipped to bar bounds via nested `<svg>` viewport. Animations use CSS `@keyframes` for drift, float, and reveal sequences.
+
+### Bar Glow Effect (Python/Colab)
+
+Since Colab's HTML sanitizer strips `<style>` and `<filter>` elements, the Python engine simulates the glow using gradient layers:
+
+1. **Dark base rect** (`#1e1f24`)
+2. **Main gradient** (gradTop -> gradBottom via `<linearGradient>`)
+3. **Side glow gradient** (sideGlow color fading left-to-right)
+4. **Left edge highlight** (thin gradient strip)
+5. **Top highlight gradient** (topGlow fading downward)
+6. **Bottom glow gradient** (bottomGlow fading upward)
+7. **White top edge** (white rect, `opacity: 0.15`)
+8. **White bottom edge** (white rect, `opacity: 0.12`)
+9. **Sparkle dots** (static circles with sparkle color, `opacity: 0.85`)
+
+All layers are clipped via nested `<svg>` viewport, identical to the frontend approach.
+
+---
+
+## Animation System (Frontend)
+
+Charts animate in 4 phases when they enter the viewport (IntersectionObserver):
+
+| Phase | Timing | Elements |
+|-------|--------|----------|
+| 1. Grid draw-in | `0s` | Grid lines draw from left via `stroke-dashoffset` |
+| 2. Label appear | `0.675s` | Y-axis labels slide in, X-axis labels rise up |
+| 3. Data reveal | `1.28s` | Lines draw in, bars grow from bottom, scatter pops, areas fade |
+| 4. Shimmer | `2.5s` | Axis labels flash bright then settle, bar glow layers fade in |
+
+### Timing Constants
+
+```
+T_LABELS   = 0.675s    (label fade-in start)
+T_DATA     = 1.28s     (data element start)
+T_SHIMMER  = 2.5s      (shimmer wave start)
+SHIMMER_STEP = 0.08s   (delay between labels)
+SHIMMER_DUR  = 0.24s   (shimmer duration per label)
+Bar grow     = 0.81s   (cubic-bezier 0.22, 1, 0.36, 1)
+Line draw    = 1.89s   (cubic-bezier 0.22, 1, 0.36, 1)
+Bar stagger  = 0.054s  (per bar index)
+```
+
+---
+
+## MCP Server
+
+The MCP server exposes 3 tools over stdio transport for AI agent integration.
+
+### Setup
+
+Add to `.mcp.json`:
 
 ```json
 {
@@ -267,129 +269,143 @@ npx tsx src/mcp/server.ts
 }
 ```
 
+Or run directly:
+
+```bash
+npx tsx src/mcp/server.ts
+```
+
 ---
 
 ### Tool: `chart_render`
 
-Renders a chart from a ChartSpec JSON object. Returns a Scene graph (for interactive React rendering) or SVG string (for static display).
+Render a chart from a ChartSpec JSON. Returns a Scene graph for the frontend, plus optional SVG.
 
 **Input Schema:**
 
 ```json
 {
   "spec": {
-    "type": "line",
-    "title": "Strategy Returns",
-    "subtitle": "Cumulative performance",
+    "type": "line | bar | stacked_bar | scatter | bubble | area | histogram | pie | donut | surface_3d | candlestick | heatmap | waterfall | violin | boxplot",
+    "title": "string (optional)",
+    "subtitle": "string (optional)",
     "series": [
       {
-        "data": [0, 5, 12, 8, 18, 25],
-        "label": "Strategy",
-        "color": "#d4d4d4"
+        "data": [1, 2, 3],
+        "x": [0, 1, 2],
+        "label": "string (optional)",
+        "color": "#hex (optional)",
+        "lineWidth": 1.5,
+        "lineStyle": "solid | dashed | dotted | dashdot",
+        "fillOpacity": 0.15,
+        "barWidth": 18,
+        "stacked": false,
+        "markerSize": 4,
+        "sizes": [10, 20, 30],
+        "open": [], "high": [], "low": [], "close": [],
+        "q1": 0, "median": 0, "q3": 0,
+        "whiskerLow": 0, "whiskerHigh": 0, "outliers": []
       }
     ],
-    "xLabels": ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
-    "grid": true
+    "slices": [
+      { "value": 30, "label": "Tech", "color": "#hex (optional)" }
+    ],
+    "donutRatio": 0.55,
+    "surface": {
+      "z": [[1, 2], [3, 4]],
+      "x": [],
+      "y": [],
+      "color": "#C084FC",
+      "wireframe": true
+    },
+    "heatmap": {
+      "data": [[1, 2], [3, 4]],
+      "rowLabels": ["A", "B"],
+      "colLabels": ["X", "Y"],
+      "colorRange": ["#0d1117", "#ff6b6b"]
+    },
+    "bins": 10,
+    "xLabels": ["Jan", "Feb", "Mar"],
+    "xAxis": { "label": "", "min": 0, "max": 100, "scale": "linear | log | symlog" },
+    "yAxis": { "label": "", "min": 0, "max": 100, "scale": "linear | log | symlog" },
+    "legend": { "show": true, "position": "best | upper-left | upper-right | lower-left | lower-right" },
+    "grid": true,
+    "width": 595,
+    "height": 260,
+    "hlines": [{ "y": 0, "color": "#494949", "label": "", "lineStyle": "solid | dashed" }],
+    "vlines": [{ "x": 0, "color": "#494949", "label": "", "lineStyle": "solid | dashed" }],
+    "annotations": [{ "text": "Note", "x": 100, "y": 50, "color": "#808080" }]
   },
-  "format": "scene"
+  "format": "scene | svg"
 }
 ```
-
-**Input Parameters:**
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `spec` | `ChartSpec` | Yes | Full chart specification (see [ChartSpec Schema](#chartspec-json-schema)) |
-| `format` | `"scene"` \| `"svg"` | No | Output format. Default: `"scene"` |
 
 **Output:**
 
 ```json
 {
-  "componentHint": "FlashChart",
+  "componentHint": "FlashChart | PieChart | Surface3D",
   "chartType": "line",
-  "scene": { ... },
+  "scene": { "...Scene graph JSON..." },
+  "pieData": { "slices": [...], "donut": false, "donutRatio": 0.55 },
+  "surfaceData": { "z": [[]], "wireframe": true },
   "svg": "<svg>...</svg>"
 }
 ```
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `componentHint` | `"FlashChart"` \| `"PieChart"` \| `"Surface3D"` | Which React component to use |
-| `chartType` | `string` | The resolved chart type |
-| `scene` | `Scene` | Scene graph for FlashChart (standard charts) |
-| `pieData` | `{ slices, donut, donutRatio }` | Data for PieChart (pie/donut types) |
-| `surfaceData` | `{ z, x, y, wireframe }` | Data for Surface3D (surface types) |
-| `svg` | `string` | SVG string (only when `format: "svg"`) |
-
-**Component routing:**
-
-| Chart Type | componentHint | Data Field |
-|-----------|---------------|------------|
-| `line`, `bar`, `stacked_bar`, `scatter`, `area`, `histogram`, `candlestick`, `waterfall`, `violin`, `boxplot`, `heatmap`, `bubble` | `FlashChart` | `scene` |
-| `pie`, `donut` | `PieChart` | `pieData` |
-| `surface`, `surface_3d` | `Surface3D` | `surfaceData` |
+The `componentHint` tells the frontend which React component to use:
+- `"FlashChart"` -- standard chart types (line, bar, scatter, area, histogram, candlestick, waterfall, violin, boxplot)
+- `"PieChart"` -- pie and donut charts
+- `"Surface3D"` -- 3D surface plots
 
 ---
 
 ### Tool: `chart_resolve_type`
 
-Given a natural language description of data, recommends the best chart type with alternatives and an example spec.
+Given a natural language description of data, recommend the best chart type.
 
 **Input Schema:**
 
 ```json
 {
-  "description": "I have monthly revenue data for 3 product lines over 2 years",
-  "columns": ["month", "product_a", "product_b", "product_c"]
+  "description": "monthly revenue by product category over the last year",
+  "columns": ["month", "product", "revenue", "units_sold"]
 }
 ```
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `description` | `string` | Yes | Natural language description of data and visualization goal |
-| `columns` | `string[]` | No | Column/field names in the dataset |
 
 **Output:**
 
 ```json
 {
-  "recommendedType": "line",
-  "alternatives": ["bar", "area", "stacked_bar"],
-  "reasoning": "Time series data with multiple series suggests a line chart for trend comparison. Bar chart works for period-by-period comparison.",
+  "recommendedType": "bar",
+  "alternatives": ["stacked_bar", "line"],
+  "reasoning": "Categorical comparison -- bar chart shows values across categories.",
   "exampleSpec": {
-    "type": "line",
-    "series": [
-      { "data": [], "label": "product_a" },
-      { "data": [], "label": "product_b" },
-      { "data": [], "label": "product_c" }
-    ],
-    "xLabels": [],
-    "grid": true
+    "type": "bar",
+    "title": "Comparison",
+    "series": [{ "data": [], "label": "Series" }],
+    "xLabels": []
   }
 }
 ```
 
-**Detection rules (in priority order):**
-
-| Keywords Detected | Recommended Type |
-|-------------------|-----------------|
-| open, high, low, close, ohlc, candlestick | `candlestick` |
-| surface, 3d, terrain, mesh | `surface_3d` |
-| correlation, heatmap, matrix, covariance | `heatmap` |
-| proportion, allocation, composition, weight, breakdown | `pie` |
-| waterfall, cumulative, bridge, flow, contribution | `waterfall` |
-| distribution, frequency, histogram, density | `histogram` |
-| scatter, relationship, regression, cluster | `scatter` |
-| comparison, compare, versus, category, sector | `bar` |
-| date, time, year, month, quarter, period | `line` |
-| *(fallback)* | `line` |
+**Resolution rules:**
+- OHLC columns (open/high/low/close) -> `candlestick`
+- 3D/surface keywords -> `surface_3d`
+- Correlation/matrix -> `heatmap`
+- Proportion/allocation -> `pie`
+- Waterfall/flow -> `waterfall`
+- Distribution/histogram -> `histogram`
+- Scatter/relationship -> `scatter`
+- Comparison/category -> `bar`
+- Time series -> `line`
+- Default -> `line`
 
 ---
 
 ### Tool: `chart_get_styles`
 
-Returns the complete theme definition, available color palettes, and the full chart type catalog. No input required.
+Returns the current theme, color palettes, and chart type catalog. No input required.
 
 **Output:**
 
@@ -398,341 +414,26 @@ Returns the complete theme definition, available color palettes, and the full ch
   "theme": {
     "name": "flash-dark",
     "background": "#121212",
-    "surface": "#0f0f0f",
-    "text": {
-      "primary": "#ffffff",
-      "secondary": "#8f8f8f",
-      "muted": "#494949",
-      "axis": "#494949"
-    },
-    "grid": { "color": "rgba(255,255,255,0.06)", "width": 0.5 },
-    "axis": { "fontFamily": "'Inter', sans-serif", "fontSize": 8, "fontWeight": 500 },
-    "title": { "fontFamily": "'EB Garamond', Georgia, serif", "fontSize": 14, "fontWeight": 500 },
-    "subtitle": { "fontFamily": "'Inter', sans-serif", "fontSize": 10 },
-    "defaultColors": ["#d4d4d4", "#707070", "#4ECDC4", "#FFD93D", "#FF6B6B", "#C084FC", "#67E8F9"],
+    "text": { "primary": "#ffffff", "secondary": "#8f8f8f", "muted": "#494949", "axis": "#494949" },
+    "grid": { "color": "#2a2a2a", "width": 0.3 },
+    "axis": { "fontFamily": "'Inter', sans-serif", "fontSize": 10, "fontWeight": 500 },
+    "title": { "fontFamily": "'EB Garamond'...", "fontSize": 18, "fontWeight": 400, "color": "#ffffff" },
+    "subtitle": { "fontFamily": "'Inter', sans-serif", "fontSize": 11, "color": "#555555" },
     "bar": {
-      "defaultFill": "#0f0f0f",
+      "defaultFill": "#1e1f24",
       "styles": [
-        { "fill": "#4aaaba", "sideGlow": "rgba(78,205,196,0.25)", "topGlow": "rgba(255,255,255,0.35)", "sparkle": "rgba(78,205,196,0.85)" },
-        { "fill": "#d8b4fe", "..." : "..." },
-        "..."
+        { "fill": "#EF8CFF", "gradTop": "#e586fa", "gradBottom": "#884f94", "sideGlow": "#624096", "topGlow": "#763AA4", "bottomGlow": "#7B42DD", "leftEdge": "#7432E6", "sparkle": "#E49BFF" },
+        { "fill": "#8CA5FF", "gradTop": "#86bafa", "gradBottom": "#4f7194", "sideGlow": "#405A96", "topGlow": "#3A5FA4", "bottomGlow": "#427BDD", "leftEdge": "#3268E6", "sparkle": "#9BB6FF" }
       ]
     }
   },
   "availableThemes": ["flash-dark"],
-  "palettes": {
-    "line": ["#d4d4d4", "#707070", "#4ECDC4", "#FFD93D", "#FF6B6B", "#C084FC", "#67E8F9", "#FCA5A5"],
-    "bar": ["#EF8CFF", "#8CA5FF", "#4ECDC4", "#FFD93D", "#FF6B6B", "#C084FC"],
-    "scatter": ["#4ECDC4", "#FFD93D", "#FF6B6B", "#C084FC", "#67E8F9", "#d4d4d4"],
-    "area": ["#4ECDC4", "#C084FC", "#FFD93D", "#FF6B6B", "#67E8F9", "#d4d4d4"],
-    "pie": ["#4aaaba", "#d8b4fe", "#fbbf24", "#f9a8d4", "#6dd5c8", "#a5f3d8", "#C084FC", "#FF6B6B", "#67E8F9", "#FFD93D"],
-    "histogram": ["#C084FC", "#4ECDC4", "#FFD93D"],
-    "candlestick": ["#4ECDC4", "#FF6B6B"],
-    "waterfall": ["#4ECDC4", "#FF6B6B", "#8CA5FF"],
-    "heatmap": ["#0d1117", "#4aaaba", "#fbbf24", "#ff6b6b"],
-    "violin": ["#C084FC", "#4ECDC4", "#FFD93D", "#FF6B6B", "#67E8F9", "#8CA5FF"],
-    "surface": ["#C084FC"]
-  },
+  "palettes": { "line": [...], "bar": [...], "scatter": [...], "area": [...], "histogram": [...], "pie": [...] },
   "chartTypes": [
-    { "type": "line", "description": "Time series, trends, multi-line comparison" },
-    { "type": "bar", "description": "Categorical comparison, grouped bars" },
-    { "type": "stacked_bar", "description": "Composition over categories" },
-    { "type": "scatter", "description": "Correlation, clusters, variable relationships" },
-    { "type": "bubble", "description": "Scatter with variable-size points" },
-    { "type": "area", "description": "Cumulative values, filled line chart" },
-    { "type": "histogram", "description": "Frequency distribution" },
-    { "type": "pie", "description": "Proportional breakdown" },
-    { "type": "donut", "description": "Pie with center cutout" },
-    { "type": "surface_3d", "description": "3D surface plot (volatility surfaces, terrain)" },
-    { "type": "candlestick", "description": "OHLC price action" },
-    { "type": "heatmap", "description": "2D grid visualization (correlations)" },
-    { "type": "waterfall", "description": "Cumulative contribution breakdown" },
-    { "type": "violin", "description": "Distribution shape comparison" },
-    { "type": "boxplot", "description": "Statistical summary with quartiles" }
+    { "type": "line", "description": "Line chart for time series and trends" },
+    { "type": "bar", "description": "Bar chart for categorical comparisons" },
+    "...15 types total..."
   ]
-}
-```
-
----
-
-## ChartSpec JSON Schema
-
-The `ChartSpec` is the primary input format for the rendering engine (used by MCP, HTTP API, and `renderChart()`).
-
-### Full Schema
-
-```typescript
-interface ChartSpec {
-  // Required
-  type: "line" | "bar" | "stacked_bar" | "scatter" | "bubble" | "area"
-      | "histogram" | "pie" | "donut" | "surface_3d" | "candlestick"
-      | "heatmap" | "waterfall" | "violin" | "boxplot";
-
-  // Metadata
-  title?: string;
-  subtitle?: string;
-
-  // Data — standard charts
-  series?: SeriesSpec[];
-
-  // Data — pie/donut
-  slices?: PieSliceSpec[];
-  donutRatio?: number;              // 0–1, default 0.55
-
-  // Data — surface
-  surface?: SurfaceSpec;
-
-  // Data — heatmap
-  heatmap?: HeatmapSpec;
-
-  // Histogram config
-  bins?: number;                     // default 10
-
-  // Axes
-  xLabels?: string[];                // categorical x-axis labels
-  xAxis?: AxisSpec;
-  yAxis?: AxisSpec;
-
-  // Display
-  legend?: LegendSpec;
-  grid?: boolean;
-  width?: number;                    // default 595
-  height?: number;                   // default 260
-
-  // Overlays
-  hlines?: { y: number; color?: string; label?: string; lineStyle?: "solid" | "dashed" }[];
-  vlines?: { x: number; color?: string; label?: string; lineStyle?: "solid" | "dashed" }[];
-  annotations?: { text: string; x: number; y: number; color?: string }[];
-}
-```
-
-### SeriesSpec
-
-```typescript
-interface SeriesSpec {
-  data: number[];                    // Y values (required)
-  x?: number[];                      // X values (for scatter, numeric axes)
-  label?: string;                    // Legend label
-  color?: string;                    // Hex color (auto-assigned if omitted)
-  lineWidth?: number;                // default 1.5
-  lineStyle?: "solid" | "dashed" | "dotted" | "dashdot";
-  fillOpacity?: number;              // Fill area under line (0–1)
-  barWidth?: number;                 // Override bar width
-  stacked?: boolean;                 // Stack with other series
-  markerSize?: number;               // Scatter point size
-  sizes?: number[];                  // Per-point sizes (bubble chart)
-
-  // Candlestick OHLC
-  open?: number[];
-  high?: number[];
-  low?: number[];
-  close?: number[];
-
-  // Boxplot
-  q1?: number;
-  median?: number;
-  q3?: number;
-  whiskerLow?: number;
-  whiskerHigh?: number;
-  outliers?: number[];
-}
-```
-
-### PieSliceSpec
-
-```typescript
-interface PieSliceSpec {
-  value: number;
-  label: string;
-  color?: string;                    // Auto-assigned from pie palette if omitted
-}
-```
-
-### SurfaceSpec
-
-```typescript
-interface SurfaceSpec {
-  z: number[][];                     // 2D height matrix (required)
-  x?: number[][];                    // Optional X coordinates
-  y?: number[][];                    // Optional Y coordinates
-  color?: string;
-  wireframe?: boolean;               // default true
-  azimuth?: number;                  // Viewing angle
-  elevation?: number;                // Viewing angle
-}
-```
-
-### HeatmapSpec
-
-```typescript
-interface HeatmapSpec {
-  data: number[][];                  // 2D value matrix
-  rowLabels?: string[];
-  colLabels?: string[];
-  colorRange?: [string, string];     // [low, high] colors
-}
-```
-
-### AxisSpec
-
-```typescript
-interface AxisSpec {
-  label?: string;
-  min?: number;
-  max?: number;
-  scale?: "linear" | "log";
-  ticks?: number[];
-  tickLabels?: string[];
-}
-```
-
-### LegendSpec
-
-```typescript
-interface LegendSpec {
-  show?: boolean;
-  position?: "top" | "bottom" | "left" | "right";
-}
-```
-
----
-
-### ChartSpec Examples
-
-#### Line Chart
-
-```json
-{
-  "type": "line",
-  "title": "Strategy vs Benchmark",
-  "subtitle": "Cumulative returns (%)",
-  "series": [
-    { "data": [0, 5, 12, 8, 18, 25, 20, 32], "label": "Strategy", "color": "#d4d4d4" },
-    { "data": [0, 3, 6, 5, 9, 12, 11, 15], "label": "Benchmark", "color": "#707070" }
-  ],
-  "xLabels": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug"],
-  "grid": true
-}
-```
-
-#### Grouped Bar Chart
-
-```json
-{
-  "type": "bar",
-  "title": "Sector Allocation",
-  "series": [
-    { "data": [28, 18, 15, 12], "label": "Current" },
-    { "data": [22, 20, 18, 10], "label": "Target" }
-  ],
-  "xLabels": ["Tech", "Health", "Finance", "Energy"],
-  "grid": true
-}
-```
-
-#### Scatter Plot
-
-```json
-{
-  "type": "scatter",
-  "title": "Risk vs Return",
-  "series": [
-    { "data": [8, 12, 6, 15, 10], "x": [5, 8, 3, 12, 7], "label": "Funds", "color": "#4ECDC4", "markerSize": 6 }
-  ],
-  "xAxis": { "label": "Volatility (%)" },
-  "yAxis": { "label": "Return (%)" },
-  "grid": true
-}
-```
-
-#### Histogram
-
-```json
-{
-  "type": "histogram",
-  "title": "Return Distribution",
-  "series": [
-    { "data": [-3, -2.5, -1, 0, 0.5, 1, 1.5, 2, -0.3, 0.8, 1.2, -0.7], "label": "Returns" }
-  ],
-  "bins": 15
-}
-```
-
-#### Pie / Donut
-
-```json
-{
-  "type": "donut",
-  "title": "Portfolio Allocation",
-  "slices": [
-    { "label": "Equities", "value": 60 },
-    { "label": "Bonds", "value": 25 },
-    { "label": "Cash", "value": 15 }
-  ],
-  "donutRatio": 0.55
-}
-```
-
-#### Candlestick
-
-```json
-{
-  "type": "candlestick",
-  "title": "NVDA Price Action",
-  "series": [{
-    "data": [130, 135, 128, 140],
-    "open": [125, 130, 136, 127],
-    "high": [132, 137, 138, 142],
-    "low": [123, 128, 126, 125],
-    "close": [130, 135, 128, 140]
-  }],
-  "xLabels": ["Mon", "Tue", "Wed", "Thu"]
-}
-```
-
-#### Surface 3D
-
-```json
-{
-  "type": "surface_3d",
-  "title": "Volatility Surface",
-  "surface": {
-    "z": [[0.3, 0.25, 0.22], [0.25, 0.21, 0.18], [0.22, 0.18, 0.16]],
-    "wireframe": true
-  }
-}
-```
-
-#### Area with Fill Between
-
-```json
-{
-  "type": "area",
-  "title": "AUM Growth",
-  "series": [
-    { "data": [100, 120, 140, 160, 180, 200], "label": "AUM", "color": "#C084FC", "fillOpacity": 0.15 }
-  ],
-  "xLabels": ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
-  "grid": true
-}
-```
-
-#### With Reference Lines & Annotations
-
-```json
-{
-  "type": "line",
-  "title": "Price with Levels",
-  "series": [{ "data": [100, 105, 98, 110, 115, 108, 120] }],
-  "hlines": [
-    { "y": 110, "color": "#FF6B6B", "lineStyle": "dashed" },
-    { "y": 100, "color": "#4ECDC4", "lineStyle": "dashed" }
-  ],
-  "annotations": [
-    { "text": "Resistance", "x": 5, "y": 112, "color": "#FF6B6B" },
-    { "text": "Support", "x": 5, "y": 97, "color": "#4ECDC4" }
-  ],
-  "grid": true
 }
 ```
 
@@ -740,266 +441,272 @@ interface LegendSpec {
 
 ## HTTP API
 
-### POST `/api/chart` — Command-based rendering
+### POST `/api/chart/render`
 
-Accepts a sequence of matplotlib-like commands, returns SVG.
+Accepts a ChartSpec JSON body, returns Scene JSON or SVG. Same as the `chart_render` MCP tool but over HTTP.
 
-**Request:**
+```bash
+curl -X POST http://localhost:3000/api/chart/render \
+  -H "Content-Type: application/json" \
+  -d '{
+    "spec": {
+      "type": "line",
+      "title": "Returns",
+      "series": [{ "data": [0, 5, 12, 8, 18], "label": "Strategy" }],
+      "grid": true
+    },
+    "format": "scene"
+  }'
+```
+
+### POST `/api/chart`
+
+Accepts matplotlib-style commands, returns SVG string.
+
+```bash
+curl -X POST http://localhost:3000/api/chart \
+  -H "Content-Type: application/json" \
+  -d '{
+    "commands": [
+      { "method": "plot", "args": [[1, 5, 12, 8, 18]], "kwargs": { "label": "Returns" } },
+      { "method": "set_title", "args": ["Strategy Returns"] },
+      { "method": "grid", "args": [true] },
+      { "method": "legend" }
+    ]
+  }'
+```
+
+---
+
+## ChartSpec Examples
+
+### Line Chart
 
 ```json
 {
-  "commands": [
-    { "method": "set_title", "args": ["Monthly Returns"] },
-    { "method": "plot", "args": [[12, -5, 18, 8, 25]], "kwargs": { "color": "#d4d4d4", "label": "Returns" } },
-    { "method": "bar", "args": [["Jan", "Feb", "Mar", "Apr", "May"], [12, -5, 18, 8, 25]], "kwargs": { "label": "PnL" } },
-    { "method": "axhline", "args": [0], "kwargs": { "color": "#555", "linestyle": "dashed" } },
-    { "method": "grid", "args": [true] },
-    { "method": "legend" }
+  "type": "line",
+  "title": "Cumulative Returns",
+  "subtitle": "Strategy vs Benchmark",
+  "series": [
+    { "data": [0, 5, 12, 8, 18, 25, 22, 30], "label": "Strategy", "color": "#d4d4d4" },
+    { "data": [0, 3, 6, 4, 10, 14, 12, 18], "label": "Benchmark", "color": "#707070" }
   ],
-  "width": 595,
-  "height": 280
+  "xLabels": ["W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8"],
+  "grid": true
 }
 ```
 
-**Supported commands:** `plot`, `bar`, `scatter`, `hist`, `fill_between`, `axhline`, `axvline`, `text`, `annotate`, `set_title`, `set_subtitle`, `set_xticks`, `set_yticks`, `grid`, `legend`
-
-**Response:** `image/svg+xml`
-
-### POST `/api/chart/render` — ChartSpec rendering
-
-Accepts a ChartSpec, returns Scene JSON or SVG.
-
-**Request:**
+### Grouped Bar Chart
 
 ```json
 {
-  "spec": {
-    "type": "bar",
-    "title": "Sector Weights",
-    "series": [{ "data": [28, 18, 15, 12], "label": "Weight %" }],
-    "xLabels": ["Tech", "Health", "Finance", "Energy"],
-    "grid": true
-  },
-  "format": "scene"
+  "type": "bar",
+  "title": "Sector Allocation",
+  "subtitle": "Portfolio weight (%)",
+  "series": [
+    { "data": [28, 18, 15, 12, 14, 13], "label": "Current" },
+    { "data": [22, 20, 18, 10, 16, 14], "label": "Target" }
+  ],
+  "xLabels": ["Tech", "Health", "Finance", "Energy", "Consumer", "Industrial"],
+  "grid": true
 }
 ```
 
-**Response (scene format):**
+### Scatter Plot
 
 ```json
 {
-  "componentHint": "FlashChart",
-  "chartType": "bar",
-  "scene": {
-    "width": 595,
-    "height": 260,
-    "theme": "flash-dark",
-    "subplots": [{ "plotArea": {...}, "elements": [...], "xAxis": {...}, "yAxis": {...}, ... }]
+  "type": "scatter",
+  "title": "Risk vs Return",
+  "series": [
+    { "data": [8, 12, 5, 15, 3, 10], "x": [5, 10, 3, 12, 2, 8], "label": "Funds", "markerSize": 6 }
+  ],
+  "hlines": [{ "y": 0, "lineStyle": "dashed" }],
+  "grid": true
+}
+```
+
+### Pie Chart
+
+```json
+{
+  "type": "pie",
+  "title": "Asset Allocation",
+  "slices": [
+    { "label": "Equities", "value": 60 },
+    { "label": "Bonds", "value": 25 },
+    { "label": "Cash", "value": 10 },
+    { "label": "Alternatives", "value": 5 }
+  ]
+}
+```
+
+### Candlestick Chart
+
+```json
+{
+  "type": "candlestick",
+  "title": "AAPL Price Action",
+  "series": [{
+    "data": [150, 152, 148, 155, 153],
+    "open": [148, 150, 152, 147, 155],
+    "high": [153, 155, 154, 158, 157],
+    "low": [146, 149, 147, 146, 151],
+    "close": [150, 152, 148, 155, 153],
+    "label": "AAPL"
+  }],
+  "xLabels": ["Mon", "Tue", "Wed", "Thu", "Fri"]
+}
+```
+
+### Histogram
+
+```json
+{
+  "type": "histogram",
+  "title": "Return Distribution",
+  "series": [{ "data": [0.5, -1.2, 0.8, -0.3, 1.5, -0.7, 2.1, -1.8, 0.2, 1.0], "label": "Returns" }],
+  "bins": 15,
+  "grid": true
+}
+```
+
+### Waterfall
+
+```json
+{
+  "type": "waterfall",
+  "title": "P&L Breakdown",
+  "series": [{ "data": [100, -20, 45, -10, -5, 110], "label": "P&L" }],
+  "xLabels": ["Revenue", "COGS", "Gross", "OpEx", "Tax", "Total"]
+}
+```
+
+### Surface 3D
+
+```json
+{
+  "type": "surface_3d",
+  "title": "Volatility Surface",
+  "surface": {
+    "z": [[1, 2, 3], [4, 5, 6], [7, 8, 9]],
+    "wireframe": true,
+    "color": "#C084FC"
   }
 }
 ```
 
-**Response (svg format):**
+### Violin Plot
 
 ```json
 {
-  "componentHint": "FlashChart",
-  "chartType": "bar",
-  "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" ...>...</svg>"
+  "type": "violin",
+  "title": "Return Distributions by Strategy",
+  "series": [
+    { "data": [1.2, -0.5, 0.8, 1.5, -0.3, 2.0, 0.1], "label": "Alpha" },
+    { "data": [0.5, 0.3, -0.2, 0.8, 0.1, -0.4, 0.6], "label": "Beta" }
+  ],
+  "xLabels": ["Alpha", "Beta"]
 }
 ```
 
-Both endpoints have CORS enabled for all origins.
+---
+
+## Python API Reference
+
+### FlashPlot
+
+```python
+from flash_plot import FlashPlot
+
+fig = FlashPlot(width=595, height=260)
+```
+
+#### Plotting Methods
+
+| Method | Description |
+|--------|-------------|
+| `fig.plot(y, *, x=None, color=None, label=None, line_width=1.5, line_style="solid", alpha=1.0, fill_opacity=None)` | Line chart |
+| `fig.bar(x_labels, y, *, color=None, label=None, alpha=1.0)` | Bar chart (auto-groups multiple series) |
+| `fig.scatter(x, y, *, color=None, label=None, size=4, alpha=1.0)` | Scatter plot |
+| `fig.hist(data, *, bins=10, color=None, label=None, alpha=1.0)` | Histogram |
+| `fig.fill_between(x, y1, y2=0, *, color=None, alpha=0.15, label=None)` | Filled area between two curves |
+| `fig.axhline(y, *, color="#494949", line_width=1, line_style="dashed")` | Horizontal reference line |
+| `fig.axvline(x, *, color="#494949", line_width=1, line_style="dashed")` | Vertical reference line |
+| `fig.text(x, y, content, *, color="#808080", font_size=10, anchor="start")` | Text annotation |
+| `fig.annotate(text, xy, *, xytext=None, color="#808080", arrow_color="#494949")` | Annotation with optional arrow |
+
+#### Configuration Methods
+
+| Method | Description |
+|--------|-------------|
+| `fig.set_title(title)` | Set chart title (EB Garamond, 18px) |
+| `fig.set_subtitle(subtitle)` | Set subtitle (Inter, 11px) |
+| `fig.set_xticks(ticks)` | Set x-axis labels (string list) or tick positions (number list) |
+| `fig.set_yticks(ticks)` | Set y-axis tick positions |
+| `fig.grid(True)` | Show grid lines |
+| `fig.legend()` | Show legend |
+
+#### Output Methods
+
+| Method | Description |
+|--------|-------------|
+| `fig.show()` | Display inline in Jupyter/Colab |
+| `fig.render()` | Return SVG string |
+| Auto-display | `fig` in a cell auto-renders via `_repr_html_` |
 
 ---
 
-## Scene Graph Output
+## Test Playground
 
-The `renderChart()` function and MCP `chart_render` tool produce a Scene graph — a complete description of the chart ready for rendering.
+Visit `http://localhost:3000/test2` for an interactive playground:
 
-```typescript
-interface Scene {
-  width: number;
-  height: number;
-  theme: string;
-  subplots: SubplotScene[];
-}
+- JSON editor for ChartSpec input
+- Example buttons for all chart types
+- Toggle between local rendering and API rendering
+- Chart settings dropdown (grid, axis labels, legend, theme)
+- Live Scene JSON inspector
+- Editable chart titles (click to edit)
 
-interface SubplotScene {
-  row: number;
-  col: number;
-  bounds: Rect;                      // { x, y, w, h }
-  plotArea: Rect;                    // Inner data area
-  title?: string;
-  subtitle?: string;
-  titleStyle?: TextStyle;
-  subtitleStyle?: TextStyle;
-  xAxis: AxisScene;
-  yAxis: AxisScene;
-  grid: GridScene;
-  elements: PlotElement[];           // Renderable chart elements
-  legend?: LegendScene;
-}
-```
-
-**Plot elements** (discriminated union on `type`):
-
-| Type | Key Fields |
-|------|------------|
-| `line` | `path`, `points[]`, `color`, `lineWidth`, `lineStyle`, `dataValues[]` |
-| `area` | `path`, `points[]`, `color`, `alpha` |
-| `bar` | `bars[]` (each: `x`, `y`, `width`, `height`, `value`, `index`), `seriesIndex`, `xLabels[]` |
-| `scatter` | `points[]` (each: `x`, `y`, `size`, `color`), `alpha` |
-| `hline` | `y`, `xMin`, `xMax`, `color`, `lineWidth`, `lineStyle` |
-| `vline` | `x`, `yMin`, `yMax`, `color`, `lineWidth`, `lineStyle` |
-| `text` | `x`, `y`, `content`, `style`, `anchor`, `rotation?` |
-| `annotation` | `text`, `xy`, `xytext?`, `style`, `arrowColor?` |
+Visit `http://localhost:3000/test` for 14 matplotlib-style API demos.
 
 ---
 
-## Architecture
+## Scrollable Bar Charts
 
-```
-ChartingEngine/
-├── core/                        # Framework-agnostic engine (2,500 LOC)
-│   ├── figure.ts                #   Figure & Axes — matplotlib-like API
-│   ├── renderChart.ts           #   ChartSpec → Scene converter
-│   ├── types.ts                 #   All TypeScript type definitions
-│   ├── theme.ts                 #   Flash Dark theme, bar glow styles
-│   ├── scales.ts                #   Linear/log scales, tick computation
-│   ├── layout.ts                #   Plot area & subplot grid layout
-│   ├── paths.ts                 #   SVG path builders (line, area, bar, scatter, histogram)
-│   └── index.ts                 #   Re-exports
-│
-├── react/                       # React renderer (2,000 LOC)
-│   ├── FlashChart.tsx           #   Main animated SVG chart component
-│   ├── PieChart.tsx             #   Pie/donut with gradient arcs
-│   ├── Surface3D.tsx            #   WebGL 3D surface (Three.js)
-│   ├── useAnimation.ts          #   Animation phase hook
-│   └── index.ts                 #   Re-exports
-│
-├── server/                      # Server-side rendering (200 LOC)
-│   ├── renderSvg.ts             #   Scene → static SVG string (no React/DOM)
-│   └── index.ts
-│
-├── src/mcp/                     # MCP server for AI agents
-│   ├── server.ts                #   stdio server with 3 tools
-│   └── tools/
-│       ├── chartRender.ts       #   chart_render tool implementation
-│       ├── chartResolve.ts      #   chart_resolve_type tool implementation
-│       └── chartStyles.ts       #   chart_get_styles tool implementation
-│
-├── src/app/api/chart/           # HTTP API endpoints
-│   ├── route.ts                 #   POST /api/chart (command-based → SVG)
-│   └── render/route.ts          #   POST /api/chart/render (ChartSpec → Scene/SVG)
-│
-├── src/app/test2/               # Interactive test playground
-│   └── page.tsx                 #   JSON editor + live chart preview
-│
-├── python/                      # Pure Python package
-│   ├── flash_plot/
-│   │   ├── __init__.py
-│   │   └── engine.py            #   FlashPlot class — renders SVG locally
-│   └── setup.py
-│
-└── notebooks/
-    └── flash_plot_demo.ipynb    #   7 chart demos for Colab/Jupyter
-```
+When a bar chart has more than 12 bars, it switches to horizontal scroll mode:
 
-### Data Flow
-
-```
-Python:  FlashPlot API → SVG string → IPython.display.HTML
-
-TypeScript (Figure API):
-  figure() → Axes commands → fig.render() → Scene graph → <FlashChart scene={} />
-
-TypeScript (ChartSpec):
-  ChartSpec JSON → renderChart() → Scene graph → <FlashChart scene={} />
-
-MCP:
-  Agent → chart_render(spec) → Scene JSON → Agent passes to frontend → <FlashChart />
-
-HTTP API:
-  POST /api/chart/render → executeChartRender() → Scene JSON / SVG
-  POST /api/chart        → Figure/Axes commands → renderSceneToSvg() → SVG
-```
+- Bar content scrolls within the SVG using coordinate remapping
+- Y-axis labels, title, grid lines, and legend stay fixed
+- Mouse wheel scrolls horizontally
+- Left/right arrow indicators appear at edges
+- Bar glow effects work correctly during scroll
 
 ---
 
-## Theme & Color Palettes
+## Interactive Features (Frontend)
 
-### Flash Dark Theme
-
-| Token | Value | Usage |
-|-------|-------|-------|
-| Background | `#121212` | Chart background |
-| Surface | `#0f0f0f` | Bar default fill |
-| Text Primary | `#ffffff` | Titles |
-| Text Secondary | `#8f8f8f` | Legend labels |
-| Text Muted | `#494949` | Axis labels, subtitles |
-| Grid | `rgba(255,255,255,0.06)` | Grid lines |
-
-### Default Color Palettes (per chart type)
-
-| Chart Type | Colors |
-|-----------|--------|
-| Line | `#d4d4d4` `#707070` `#4ECDC4` `#FFD93D` `#FF6B6B` `#C084FC` `#67E8F9` `#FCA5A5` |
-| Bar | `#EF8CFF` `#8CA5FF` `#4ECDC4` `#FFD93D` `#FF6B6B` `#C084FC` |
-| Scatter | `#4ECDC4` `#FFD93D` `#FF6B6B` `#C084FC` `#67E8F9` `#d4d4d4` |
-| Area | `#4ECDC4` `#C084FC` `#FFD93D` `#FF6B6B` `#67E8F9` `#d4d4d4` |
-| Pie | `#4aaaba` `#d8b4fe` `#fbbf24` `#f9a8d4` `#6dd5c8` `#a5f3d8` `#C084FC` `#FF6B6B` `#67E8F9` `#FFD93D` |
-| Histogram | `#C084FC` `#4ECDC4` `#FFD93D` |
-| Candlestick | `#4ECDC4` (up) `#FF6B6B` (down) |
-| Waterfall | `#4ECDC4` (positive) `#FF6B6B` (negative) `#8CA5FF` (total) |
-| Heatmap | `#0d1117` → `#4aaaba` → `#fbbf24` → `#ff6b6b` |
-
-### Bar Glow Styles
-
-Each bar series has a unique multi-layer glow effect with 5 layers: side glow, top highlight, bottom glow, left edge, and sparkle dots.
-
-| Series | Fill | Glow Style |
-|--------|------|------------|
-| 1 | `#4aaaba` | Teal glow |
-| 2 | `#d8b4fe` | Purple glow |
-| 3 | `#fbbf24` | Gold glow |
-| 4 | `#f9a8d4` | Pink glow |
-| 5 | `#6dd5c8` | Mint glow |
-
----
-
-## Animation System
-
-The React `<FlashChart>` component includes a multi-phase CSS keyframe animation system:
-
-| Phase | Timing | Elements |
-|-------|--------|----------|
-| 1. Grid Draw | 0–0.675s | Grid lines draw in sequentially with `stroke-dashoffset` |
-| 2. Labels | 0.675s+ | Y-axis labels slide in, X-axis labels fade up |
-| 3. Data | 1.28s+ | Lines draw, bars grow (scaleY), areas fade, scatter pops |
-| 4. Shimmer | 2.5s+ | Axis labels get a brightness wave sweep |
-| 5. Bar Sweep | After bars | Sequential highlight pulse across bars |
-| 6. Glow Reveal | After sweep | Bar glow layers fade in with drift + sparkle animations |
-
-All animations trigger on viewport intersection (IntersectionObserver with 15% threshold).
+- **Line tooltips**: Hover shows crosshair + dot on each series + value tooltip
+- **Scatter tooltips**: Hover shows exact x, y coordinates
+- **Bar tooltips**: Hover shows value with series label
+- **Editable titles**: Click chart title or subtitle to edit inline
+- **Chart settings**: Dropdown to toggle grid, axis labels, legend, theme (dark/light/naked)
+- **Viewport animation**: Charts animate when scrolled into view (IntersectionObserver)
 
 ---
 
 ## Requirements
 
-### Python
-- Python 3.8+
-- No external dependencies
-- Optional: `numpy` (arrays auto-converted), `ipython` (for `display()`)
-
 ### TypeScript
-- Node.js 18+
-- Next.js 16+
-- React 19+
-- Dependencies: `@modelcontextprotocol/sdk` (MCP server only)
 
----
+- Node.js >= 18
+- Next.js >= 16
+- React >= 19
+- `@modelcontextprotocol/sdk` (MCP tools)
+- `tsx` (dev, for running MCP server)
 
-## License
+### Python
 
-MIT
+- Python >= 3.8
+- No required dependencies (pure Python SVG)
+- Optional: `ipython` (for notebook display), `numpy` (auto-converted)
