@@ -192,7 +192,7 @@ export default function CandlestickChart({
   useEffect(() => { const id = setInterval(() => setUtc(utcStr()), 1000); return () => clearInterval(id); }, []);
 
   // ── Layout constants ──────────────────────────────────────────────
-  const Y_AXIS_W = 65; // right y-axis width (fixed)
+  const Y_AXIS_W = 72; // right y-axis width (fixed)
   const PLOT_PAD = { top: 6, bottom: 22, left: 10 };
   const chartW = containerW - Y_AXIS_W; // scrollable area width
   const plotH = containerH - PLOT_PAD.top - PLOT_PAD.bottom;
@@ -288,15 +288,19 @@ export default function CandlestickChart({
     >
       <style>{CANDLE_CSS}</style>
 
-      {/* ── Row 1: OHLC pill (left) + Ticker|Interval (right) ──────── */}
+      {/* ── Row 1: Ticker (left) + OHLC pill (right) ────────────── */}
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "8px 10px 4px", opacity: visible ? 1 : 0, transition: "opacity 0.5s ease 0.3s",
       }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+          {ticker && <span style={{ color: C.yLbl, fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em" }}>{ticker}</span>}
+          {interval && <span style={{ color: C.ticker, fontSize: 11 }}>{interval}</span>}
+        </div>
         <div className="fp-candle-ohlc-bg" style={{
-          display: "inline-flex", alignItems: "center", gap: 3,
-          background: C.ohlcBg, borderRadius: 2, padding: "2px 8px",
-          fontSize: 9, fontWeight: 500, lineHeight: "18px",
+          display: "inline-flex", alignItems: "center", gap: 4,
+          background: C.ohlcBg, borderRadius: 3, padding: "3px 10px",
+          fontSize: 10, fontWeight: 500, lineHeight: "18px",
         }}>
           <span style={{ color: C.ohlcLbl }}>O</span>
           <span style={{ color: hCol }}>{fmt(hO)}</span>
@@ -306,11 +310,6 @@ export default function CandlestickChart({
           <span style={{ color: hCol }}>{fmt(hL)}</span>
           <span style={{ color: C.ohlcLbl, marginLeft: 4 }}>C</span>
           <span style={{ color: hCol }}>{fmt(hC)}</span>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 9 }}>
-          {ticker && <span style={{ color: C.ticker }}>{ticker}</span>}
-          {interval && ticker && <span style={{ color: "#3a3a3e" }}>|</span>}
-          {interval && <span style={{ color: C.ticker }}>{interval}</span>}
         </div>
       </div>
 
@@ -487,7 +486,7 @@ export default function CandlestickChart({
               const y = scaleY(p);
               if (y < PLOT_PAD.top - 6 || y > PLOT_PAD.top + plotH + 6) return null;
               return (
-                <text key={`yt${i}`} x={8} y={y + 4} fontSize={11}
+                <text key={`yt${i}`} x={8} y={y + 4} fontSize={12}
                   fontFamily="var(--font-instrument-serif), 'Instrument Serif', serif"
                   fill={C.yLbl}
                   style={visible ? { animation: `fp-cLblY 0.35s ease ${(0.45 + i * 0.03).toFixed(2)}s both` } as React.CSSProperties : { opacity: 0 }}
@@ -513,8 +512,8 @@ export default function CandlestickChart({
                 if (b.y < PLOT_PAD.top - 10 || b.y > PLOT_PAD.top + plotH + 10) return null;
                 return (
                   <g key={i} style={visible ? { animation: "fp-cFade 0.5s ease 1.5s both" } as React.CSSProperties : { opacity: 0 }}>
-                    <rect x={2} y={b.y - 9} width={60} height={18} fill={badgeCol} rx={1} />
-                    <text x={6} y={b.y + 4} fontSize={11}
+                    <rect x={2} y={b.y - 10} width={62} height={20} fill={badgeCol} rx={2} />
+                    <text x={6} y={b.y + 4} fontSize={12}
                       fontFamily="var(--font-instrument-serif), 'Instrument Serif', serif"
                       fill="#fff" fontWeight={400}
                     >{fmt(b.price)}</text>
