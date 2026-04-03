@@ -222,8 +222,8 @@ export default function CandlestickChart({
   data,
   title,
   subtitle,
-  width: w = 546,
-  height: h = 344,
+  width: w = 595,
+  height: h = 260,
   grid = true,
   showLegend = true,
   theme = "dark",
@@ -269,7 +269,7 @@ export default function CandlestickChart({
   const isNaked = theme === "naked";
 
   // ── Layout ──────────────────────────────────────────────────────────
-  const PAD = { top: 10, right: 62, bottom: 48, left: 14 };
+  const PAD = { top: 8, right: 62, bottom: 40, left: 14 };
   const plotW = w - PAD.left - PAD.right;
   const plotH = h - PAD.top - PAD.bottom;
   const plotX = PAD.left;
@@ -279,7 +279,7 @@ export default function CandlestickChart({
   const allHigh = useMemo(() => Math.max(...high.slice(0, n)), [high, n]);
   const allLow = useMemo(() => Math.min(...low.slice(0, n)), [low, n]);
   const priceAxis = useMemo(
-    () => computePriceTicks(allLow, allHigh, 11),
+    () => computePriceTicks(allLow, allHigh, 8),
     [allLow, allHigh],
   );
 
