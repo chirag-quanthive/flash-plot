@@ -288,29 +288,22 @@ export default function CandlestickChart({
     >
       <style>{CANDLE_CSS}</style>
 
-      {/* ── Row 1: Ticker (left) + OHLC pill (right) ────────────── */}
-      <div style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "8px 10px 4px", opacity: visible ? 1 : 0, transition: "opacity 0.5s ease 0.3s",
+      {/* ── OHLC pill — pulls up to sit beside the external ChartHeader title ── */}
+      <div className="fp-candle-ohlc-bg" style={{
+        display: "inline-flex", alignItems: "center", gap: 4,
+        background: C.ohlcBg, borderRadius: 3, padding: "3px 10px",
+        fontSize: 10, fontWeight: 500, lineHeight: "18px",
+        marginTop: -20, marginLeft: 10,
+        opacity: visible ? 1 : 0, transition: "opacity 0.5s ease 0.3s",
       }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-          {ticker && <span style={{ color: C.yLbl, fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em" }}>{ticker}</span>}
-          {interval && <span style={{ color: C.ticker, fontSize: 11 }}>{interval}</span>}
-        </div>
-        <div className="fp-candle-ohlc-bg" style={{
-          display: "inline-flex", alignItems: "center", gap: 4,
-          background: C.ohlcBg, borderRadius: 3, padding: "3px 10px",
-          fontSize: 10, fontWeight: 500, lineHeight: "18px",
-        }}>
-          <span style={{ color: C.ohlcLbl }}>O</span>
-          <span style={{ color: hCol }}>{fmt(hO)}</span>
-          <span style={{ color: C.ohlcLbl, marginLeft: 4 }}>H</span>
-          <span style={{ color: hCol }}>{fmt(hH)}</span>
-          <span style={{ color: C.ohlcLbl, marginLeft: 4 }}>L</span>
-          <span style={{ color: hCol }}>{fmt(hL)}</span>
-          <span style={{ color: C.ohlcLbl, marginLeft: 4 }}>C</span>
-          <span style={{ color: hCol }}>{fmt(hC)}</span>
-        </div>
+        <span style={{ color: C.ohlcLbl }}>O</span>
+        <span style={{ color: hCol }}>{fmt(hO)}</span>
+        <span style={{ color: C.ohlcLbl, marginLeft: 4 }}>H</span>
+        <span style={{ color: hCol }}>{fmt(hH)}</span>
+        <span style={{ color: C.ohlcLbl, marginLeft: 4 }}>L</span>
+        <span style={{ color: hCol }}>{fmt(hL)}</span>
+        <span style={{ color: C.ohlcLbl, marginLeft: 4 }}>C</span>
+        <span style={{ color: hCol }}>{fmt(hC)}</span>
       </div>
 
       {/* ── Chart area: scrollable candles (left) + fixed y-axis (right) ── */}
