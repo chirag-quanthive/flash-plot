@@ -981,13 +981,16 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                 lines.append('</clipPath>')
             lines.append('</defs>')
 
-            # ── OHLC pill (below subtitle, above chart area) ──
-            # Position: subtitle_bottom + 6px gap
-            _sub_bottom = 14 + (sp.title_style.font_size + 4 if sp.title else 0) + \
-                          (sp.subtitle_style.font_size if sp.subtitle else 0)
-            ohlc_pill_y = _sub_bottom + 6  # top of pill rect
-            ohlc_text_y = ohlc_pill_y + 13  # text baseline inside pill
-            ohlc_x = pa.x
+            # ── OHLC pill (right-adjacent to title, Figma style) ──
+            # Estimate title width: serif font ~0.55 em per char
+            _title_text = sp.title or ""
+            _title_fs = sp.title_style.font_size if sp.title_style else 18
+            _title_w = len(_title_text) * _title_fs * 0.55
+            ohlc_x = pa.x + _title_w + 10  # 10px gap after title
+            # Vertically center pill with title baseline
+            _title_baseline = 14 + _title_fs
+            ohlc_pill_y = _title_baseline - 14  # pill top, so pill center ≈ title center
+            ohlc_text_y = ohlc_pill_y + 13
             anim_ohlc = ""
             if animate:
                 anim_ohlc = f' style="animation:fp-refFade 0.5s ease 0.3s both"'
@@ -1103,7 +1106,7 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                              f'stroke-dasharray="2 3" opacity="0.35"{anim_badge}/>')
 
             # ── Bottom bar: timeframes (left) + calendar + divider + UTC clock (right) ──
-            bot_y = pa.y + pa.h + 48
+            bot_y = pa.y + pa.h + 54
             anim_bot = ""
             if animate:
                 anim_bot = f' style="animation:fp-refFade 0.5s ease 1.2s both"'
