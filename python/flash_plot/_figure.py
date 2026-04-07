@@ -222,10 +222,36 @@ class PiePlotElement:
     label: Optional[str] = None
     zorder: int = 0
 
+@dataclass
+class CandlestickBar:
+    """Pixel geometry for one candlestick."""
+    index: int
+    center_x: float
+    wick_y_top: float   # high → pixel y
+    wick_y_bot: float   # low → pixel y
+    body_y_top: float   # max(open,close) → pixel y
+    body_y_bot: float   # min(open,close) → pixel y
+    body_width: float
+    wick_width: float
+    is_bull: bool
+    open: float; high: float; low: float; close: float
+
+@dataclass
+class CandlestickPlotElement:
+    kind: str = "candlestick"
+    candles: List[CandlestickBar] = field(default_factory=list)
+    bull_color: str = "#4ECDC4"
+    bear_color: str = "#FF6B6B"
+    wick_color: str = "#808080"
+    label: Optional[str] = None
+    zorder: int = 0
+    x_labels: List[str] = field(default_factory=list)
+
 PlotElement = Union[
     LinePlotElement, AreaPlotElement, BarPlotElement, ScatterPlotElement,
     HLinePlotElement, VLinePlotElement, TextPlotElement, AnnotationPlotElement,
     BoxPlotElement, ViolinPlotElement, SurfacePlotElement, PiePlotElement,
+    CandlestickPlotElement,
 ]
 
 @dataclass
@@ -342,6 +368,16 @@ class _PieCmd:
     colors: Optional[List[str]] = None
     opts: Dict[str, Any] = field(default_factory=dict)
 
+@dataclass
+class _CandlestickCmd:
+    kind: str = "candlestick"
+    opens: List[float] = field(default_factory=list)
+    highs: List[float] = field(default_factory=list)
+    lows: List[float] = field(default_factory=list)
+    closes: List[float] = field(default_factory=list)
+    x_labels: List[str] = field(default_factory=list)
+    opts: Dict[str, Any] = field(default_factory=dict)
+
 
 # ── Axes Class ──────────────────────────────────────────────────────────
 
@@ -442,6 +478,15 @@ class Axes:
         self._commands.append(_PieCmd(values=vals, labels=lbls, colors=colors, opts=kwargs))
         return self
 
+    def candlestick(self, opens, highs, lows, closes, x_labels=None, **kwargs) -> "Axes":
+        """candlestick(opens, highs, lows, closes, x_labels=None, bull_color=..., bear_color=...)"""
+        self._commands.append(_CandlestickCmd(
+            opens=list(opens), highs=list(highs), lows=list(lows), closes=list(closes),
+            x_labels=list(x_labels) if x_labels else [],
+            opts=kwargs,
+        ))
+        return self
+
     def axhline(self, y, **kwargs) -> "Axes":
         self._commands.append(_HLineCmd(y=y, opts=kwargs))
         return self
@@ -531,6 +576,7 @@ class Axes:
         has_bar = False
         has_stacked_bars = False
         bar_series_count = 0
+        has_candlestick = any(isinstance(c, _CandlestickCmd) for c in self._commands)
 
         for idx, cmd in enumerate(self._commands):
             if isinstance(cmd, _PlotCmd):
@@ -588,6 +634,14 @@ class Axes:
                 for ds in cmd.datasets:
                     for v in ds:
                         y_lo, y_hi = min(y_lo, v), max(y_hi, v)
+            elif isinstance(cmd, _CandlestickCmd):
+                n = len(cmd.opens)
+                x_lo, x_hi = min(x_lo, 0), max(x_hi, max(n - 1, 0))
+                for v in cmd.highs:
+                    y_hi = max(y_hi, v)
+                for v in cmd.lows:
+                    y_lo = min(y_lo, v)
+
             elif isinstance(cmd, _PieCmd):
                 # Pie charts don't use x/y axes; set defaults
                 if x_lo == float("inf"):
@@ -635,6 +689,18 @@ class Axes:
                     TickMark(i, lbl, pa.x + (pa.w / 2 if len(labels) <= 1 else (i / (len(labels) - 1)) * pa.w))
                     for i, lbl in enumerate(labels)
                 ]
+        elif has_candlestick:
+            cs_cmd = next(c for c in self._commands if isinstance(c, _CandlestickCmd))
+            n = len(cs_cmd.opens)
+            gw = pa.w / max(n, 1)
+            labels = cs_cmd.x_labels or [str(i) for i in range(n)]
+            # Show at most ~8 tick labels to avoid crowding
+            step = max(1, math.ceil(n / 8))
+            x_tick_marks = [
+                TickMark(i, labels[i], pa.x + i * gw + gw / 2)
+                for i in range(n) if i % step == 0
+            ]
+
         elif has_bar:
             bar_cmd = next((c for c in self._commands if isinstance(c, _BarCmd)), None)
             if bar_cmd and isinstance(bar_cmd.x_data[0], str):
@@ -911,6 +977,44 @@ class Axes:
                 elements.append(el)
                 if el.label:
                     legend_entries.append(LegendEntry(el.label, color, "area"))
+
+            elif isinstance(cmd, _CandlestickCmd):
+                n = len(cmd.opens)
+                if n == 0:
+                    continue
+                gw = pa.w / n
+                body_w = max(gw * 0.55, 3.0)
+                wick_w = max(gw * 0.08, 1.0)
+                bull_color = cmd.opts.get("bull_color", "#4ECDC4")
+                bear_color = cmd.opts.get("bear_color", "#FF6B6B")
+                wick_color = cmd.opts.get("wick_color", "#808080")
+                candles = []
+                for i in range(n):
+                    cx = pa.x + i * gw + gw / 2
+                    def yp(v):
+                        return pa.y + pa.h - ((v - y_lo) / y_range) * pa.h
+                    is_bull = cmd.closes[i] >= cmd.opens[i]
+                    body_top = yp(max(cmd.opens[i], cmd.closes[i]))
+                    body_bot = yp(min(cmd.opens[i], cmd.closes[i]))
+                    candles.append(CandlestickBar(
+                        index=i, center_x=cx,
+                        wick_y_top=yp(cmd.highs[i]),
+                        wick_y_bot=yp(cmd.lows[i]),
+                        body_y_top=body_top,
+                        body_y_bot=body_bot,
+                        body_width=body_w,
+                        wick_width=wick_w,
+                        is_bull=is_bull,
+                        open=cmd.opens[i], high=cmd.highs[i],
+                        low=cmd.lows[i], close=cmd.closes[i],
+                    ))
+                x_labels_list = cmd.x_labels or [str(i) for i in range(n)]
+                el = CandlestickPlotElement(
+                    candles=candles, bull_color=bull_color, bear_color=bear_color,
+                    wick_color=wick_color, x_labels=x_labels_list,
+                    label=cmd.opts.get("label"), zorder=cmd.opts.get("zorder", z),
+                )
+                elements.append(el)
 
             elif isinstance(cmd, _PieCmd):
                 total = sum(cmd.values) or 1

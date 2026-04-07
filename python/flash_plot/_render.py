@@ -14,6 +14,7 @@ from ._figure import (
     LinePlotElement, AreaPlotElement, BarPlotElement, ScatterPlotElement,
     HLinePlotElement, VLinePlotElement, TextPlotElement, AnnotationPlotElement,
     BoxPlotElement, ViolinPlotElement, SurfacePlotElement, PiePlotElement,
+    CandlestickPlotElement, CandlestickBar,
 )
 
 
@@ -893,6 +894,27 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
             }
             lines.append(f'<desc id="fp-sdata-{uid}" style="display:none">'
                          f'{_esc(json.dumps(surf_data, separators=(",",":")))}</desc>')
+
+        elif isinstance(el, CandlestickPlotElement):
+            for i, c in enumerate(el.candles):
+                delay = T_DATA + i * 0.04
+                anim_style = ""
+                if animate:
+                    anim_style = f' style="animation:fp-refFade 0.4s ease {delay:.2f}s both"'
+                color = el.bull_color if c.is_bull else el.bear_color
+                # Wick — thin vertical line from high to low
+                wx = c.center_x
+                lines.append(
+                    f'<line x1="{wx:.1f}" y1="{c.wick_y_top:.1f}" x2="{wx:.1f}" y2="{c.wick_y_bot:.1f}" '
+                    f'stroke="{el.wick_color}" stroke-width="{c.wick_width:.1f}"{anim_style}/>'
+                )
+                # Body — colored rect from body_y_top to body_y_bot
+                bx = c.center_x - c.body_width / 2
+                body_h = max(c.body_y_bot - c.body_y_top, 1.0)
+                lines.append(
+                    f'<rect x="{bx:.1f}" y="{c.body_y_top:.1f}" width="{c.body_width:.1f}" height="{body_h:.1f}" '
+                    f'rx="1" fill="{color}"{anim_style}/>'
+                )
 
         elif isinstance(el, PiePlotElement):
             pcx, pcy, pr = el.cx, el.cy, el.radius

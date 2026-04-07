@@ -110,7 +110,7 @@ def render_chart(spec: Dict[str, Any], *, display: bool = True) -> Optional[str]
         ax.legend()
 
     # X ticks override
-    if x_labels and chart_type not in ("bar", "stacked_bar", "waterfall"):
+    if x_labels and chart_type not in ("bar", "stacked_bar", "waterfall", "candlestick"):
         ax.set_xticks(x_labels)
 
     if display:
@@ -232,7 +232,7 @@ def _render_pie(ax, spec: dict, chart_type: str):
 
 
 def _render_candlestick(ax, series: list, x_labels: list):
-    """Render candlestick as bars with correct OHLC positioning."""
+    """Render candlestick chart using dedicated candlestick element."""
     if not series:
         return
     s = series[0]
@@ -240,20 +240,9 @@ def _render_candlestick(ax, series: list, x_labels: list):
     highs = s.get("high", [])
     lows = s.get("low", [])
     closes = s.get("close", [])
-    n = len(opens)
-    for i in range(n):
-        is_bull = closes[i] >= opens[i]
-        color = "#4ECDC4" if is_bull else "#FF6B6B"
-        body_low = min(opens[i], closes[i])
-        body_high = max(opens[i], closes[i])
-        body_h = body_high - body_low or 0.001
-        lbl = x_labels[i] if i < len(x_labels) else str(i)
-        # Wick (thin bar from low to high)
-        ax.bar([lbl], [highs[i] - lows[i]], color="#707070", width=2, bottom=[lows[i]])
-        # Body (wide bar from body_low to body_high)
-        ax.bar([lbl], [body_h], color=color, width=14, bottom=[body_low])
-    if x_labels:
-        ax.set_xticks(x_labels)
+    if not opens:
+        return
+    ax.candlestick(opens, highs, lows, closes, x_labels=x_labels or None)
 
 
 def _render_waterfall(ax, series: list, x_labels: list):
