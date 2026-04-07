@@ -79,7 +79,7 @@ def render_chart(spec: Dict[str, Any], *, display: bool = True) -> Optional[str]
     elif chart_type in ("pie", "donut"):
         _render_pie(ax, spec, chart_type)
     elif chart_type == "candlestick":
-        _render_candlestick(ax, series_list, x_labels)
+        _render_candlestick(ax, series_list, x_labels, spec=spec)
     elif chart_type == "waterfall":
         _render_waterfall(ax, series_list, x_labels)
     elif chart_type == "violin":
@@ -231,7 +231,7 @@ def _render_pie(ax, spec: dict, chart_type: str):
     ax.pie(values, **kwargs)
 
 
-def _render_candlestick(ax, series: list, x_labels: list):
+def _render_candlestick(ax, series: list, x_labels: list, spec: dict = None):
     """Render candlestick chart using dedicated candlestick element."""
     if not series:
         return
@@ -242,7 +242,15 @@ def _render_candlestick(ax, series: list, x_labels: list):
     closes = s.get("close", [])
     if not opens:
         return
-    ax.candlestick(opens, highs, lows, closes, x_labels=x_labels or None)
+    kwargs = {}
+    if spec:
+        if spec.get("ticker"):
+            kwargs["ticker"] = spec["ticker"]
+        if spec.get("interval"):
+            kwargs["interval"] = spec["interval"]
+    elif s.get("label"):
+        kwargs["ticker"] = s["label"]
+    ax.candlestick(opens, highs, lows, closes, x_labels=x_labels or None, **kwargs)
 
 
 def _render_waterfall(ax, series: list, x_labels: list):

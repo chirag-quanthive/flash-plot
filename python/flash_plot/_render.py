@@ -410,6 +410,8 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
 
     # Check if subplot contains only pie charts (skip grid/axes)
     is_pie_only = all(isinstance(el, PiePlotElement) for el in sp.elements) and len(sp.elements) > 0
+    # Check if subplot is a candlestick chart (override fonts)
+    is_candlestick = any(isinstance(el, CandlestickPlotElement) for el in sp.elements)
 
     # Add extra height for legend below x-axis (pie charts use side legend, no extra height)
     if is_pie_only or not (sp.legend and sp.legend.entries):
@@ -541,10 +543,18 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
             shimmer_delay = T_SHIMMER + i * SHIMMER_STEP
             shimmer = f'fp-shimmer {SHIMMER_DUR}s ease {shimmer_delay:.2f}s 1'
             anim_style = f'--fp-base:{ts.color};animation:{fade},{shimmer};'
-        lines.append(f'<text class="fp-ax" x="{pa.x - 4:.1f}" y="{t.position + 3:.1f}" text-anchor="end" '
-                     f'font-size="{ts.font_size}" font-weight="{ts.font_weight}" '
-                     f'font-family="{_esc(ts.font_family)}" letter-spacing="{ts.letter_spacing}" '
-                     f'fill="{ts.color}" style="{anim_style}">{_esc(t.label)}</text>')
+        if is_candlestick:
+            # Candlestick: right-aligned y-axis, Instrument Serif, white, 12px
+            y_lbl_x = pa.x + pa.w + 8
+            lines.append(f'<text class="fp-ax" x="{y_lbl_x:.1f}" y="{t.position + 4:.1f}" text-anchor="start" '
+                         f'font-size="12" font-weight="400" '
+                         f'font-family="\'Instrument Serif\', serif" '
+                         f'fill="#fff" style="{anim_style}">{_esc(t.label)}</text>')
+        else:
+            lines.append(f'<text class="fp-ax" x="{pa.x - 4:.1f}" y="{t.position + 3:.1f}" text-anchor="end" '
+                         f'font-size="{ts.font_size}" font-weight="{ts.font_weight}" '
+                         f'font-family="{_esc(ts.font_family)}" letter-spacing="{ts.letter_spacing}" '
+                         f'fill="{ts.color}" style="{anim_style}">{_esc(t.label)}</text>')
     lines.append('</g>')
 
     # ── X labels (with shimmer) ────────────────────────────────────────
@@ -557,10 +567,17 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
             shimmer_delay = T_SHIMMER + i * SHIMMER_STEP
             shimmer = f'fp-shimmer {SHIMMER_DUR}s ease {shimmer_delay:.2f}s 1'
             anim_style = f'--fp-base:{ts.color};animation:{fade},{shimmer};'
-        lines.append(f'<text class="fp-ax" x="{t.position:.1f}" y="{h - 4:.1f}" text-anchor="middle" '
-                     f'font-size="{ts.font_size}" font-weight="{ts.font_weight}" '
-                     f'font-family="{_esc(ts.font_family)}" letter-spacing="{ts.letter_spacing}" '
-                     f'fill="{ts.color}" style="{anim_style}">{_esc(t.label)}</text>')
+        if is_candlestick:
+            # Candlestick: 9px Inter, #707073, positioned below separator
+            lines.append(f'<text class="fp-ax" x="{t.position:.1f}" y="{pa.y + pa.h + 15:.1f}" text-anchor="middle" '
+                         f'font-size="9" font-weight="500" '
+                         f'font-family="\'Inter\', sans-serif" '
+                         f'fill="#707073" style="{anim_style}">{_esc(t.label)}</text>')
+        else:
+            lines.append(f'<text class="fp-ax" x="{t.position:.1f}" y="{h - 4:.1f}" text-anchor="middle" '
+                         f'font-size="{ts.font_size}" font-weight="{ts.font_weight}" '
+                         f'font-family="{_esc(ts.font_family)}" letter-spacing="{ts.letter_spacing}" '
+                         f'fill="{ts.color}" style="{anim_style}">{_esc(t.label)}</text>')
     lines.append('</g>')  # close x labels
     lines.append('</g>')  # close axis labels parent group
 
@@ -896,45 +913,59 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                          f'{_esc(json.dumps(surf_data, separators=(",",":")))}</desc>')
 
         elif isinstance(el, CandlestickPlotElement):
-            # ── Gradient defs for each candle (Figma frame 332:34) ──
+            # ── Figma frame 332:34 — full candlestick chart chrome ──
+            n_candles = len(el.candles)
+            if n_candles == 0:
+                continue
+
+            # Last candle for OHLC pill and price badges
+            lc = el.candles[-1]
+            last_up = lc.close >= lc.open
+            ohlc_color = "#4ECDC4" if last_up else "#E0484C"
+            badge_color = ohlc_color
+
+            # Format price helper
+            def _fmt_price(v):
+                return f"{v:.2f}" if abs(v) >= 1 else f"{v:.4f}"
+
+            # ── Gradient defs ──
             lines.append('<defs>')
             lines.append(f'<filter id="cGlow-{uid}" x="-30%" y="-30%" width="160%" height="160%">')
             lines.append('  <feGaussianBlur in="SourceGraphic" stdDeviation="1.5"/>')
             lines.append('</filter>')
+            # Left fade gradient
+            lines.append(f'<linearGradient id="cFadeL-{uid}" x1="0" y1="0" x2="1" y2="0">')
+            lines.append(f'  <stop offset="0%" stop-color="#121318" stop-opacity="1"/>')
+            lines.append(f'  <stop offset="100%" stop-color="#121318" stop-opacity="0"/>')
+            lines.append('</linearGradient>')
             for i, c in enumerate(el.candles):
                 cid = f"cs-{uid}-{i}"
                 if c.is_bull:
-                    # Bull wick gradient
                     lines.append(f'<linearGradient id="{cid}-w" x1="0" y1="0" x2="0" y2="1">')
                     lines.append('  <stop offset="0%" stop-color="#ADE2B4"/>')
                     lines.append('  <stop offset="19%" stop-color="#A5D5A1"/>')
                     lines.append('  <stop offset="60%" stop-color="#88CB86"/>')
                     lines.append('  <stop offset="100%" stop-color="#A0B7AF"/>')
                     lines.append('</linearGradient>')
-                    # Bull body gradient
                     lines.append(f'<linearGradient id="{cid}-b" x1="0" y1="0" x2="0" y2="1">')
                     lines.append('  <stop offset="0%" stop-color="#8CE97E"/>')
                     lines.append('  <stop offset="100%" stop-color="#317430"/>')
                     lines.append('</linearGradient>')
-                    # Bull highlight gradient
                     lines.append(f'<linearGradient id="{cid}-h" x1="0" y1="0" x2="0" y2="1">')
                     lines.append('  <stop offset="0%" stop-color="#B9F7B6"/>')
                     lines.append('  <stop offset="100%" stop-color="#B9F7B6" stop-opacity="0"/>')
                     lines.append('</linearGradient>')
                 else:
-                    # Bear wick gradient
                     lines.append(f'<linearGradient id="{cid}-w" x1="0" y1="0" x2="0" y2="1">')
                     lines.append('  <stop offset="0%" stop-color="#D24445"/>')
                     lines.append('  <stop offset="36%" stop-color="#FFDCA3"/>')
                     lines.append('  <stop offset="77%" stop-color="#D96058"/>')
                     lines.append('  <stop offset="100%" stop-color="#E57B77"/>')
                     lines.append('</linearGradient>')
-                    # Bear body gradient
                     lines.append(f'<linearGradient id="{cid}-b" x1="0" y1="0" x2="0" y2="1">')
                     lines.append('  <stop offset="0%" stop-color="#f1946b" stop-opacity="0.9"/>')
                     lines.append('  <stop offset="100%" stop-color="#FF4948"/>')
                     lines.append('</linearGradient>')
-                    # Bear highlight gradient
                     lines.append(f'<linearGradient id="{cid}-h" x1="0" y1="0" x2="0" y2="1">')
                     lines.append('  <stop offset="0%" stop-color="#FFF4B8"/>')
                     lines.append('  <stop offset="100%" stop-color="#FFF4B8" stop-opacity="0"/>')
@@ -950,6 +981,27 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                 lines.append('</clipPath>')
             lines.append('</defs>')
 
+            # ── OHLC pill (top-left, below title/subtitle) ──
+            ohlc_y = pa.y - 6
+            ohlc_x = pa.x
+            anim_ohlc = ""
+            if animate:
+                anim_ohlc = f' style="animation:fp-refFade 0.5s ease 0.3s both"'
+            lines.append(f'<g{anim_ohlc}>')
+            lines.append(f'<rect x="{ohlc_x:.1f}" y="{ohlc_y - 14:.1f}" width="220" height="18" '
+                         f'rx="3" fill="#242424"/>')
+            _ox = ohlc_x + 8
+            for lbl_char, val in [("O", lc.open), ("H", lc.high), ("L", lc.low), ("C", lc.close)]:
+                lines.append(f'<text x="{_ox:.1f}" y="{ohlc_y - 2:.1f}" '
+                             f'font-size="9" font-weight="500" fill="#fff" '
+                             f'font-family="\'Inter\', sans-serif">{lbl_char}</text>')
+                _ox += 10
+                lines.append(f'<text x="{_ox:.1f}" y="{ohlc_y - 2:.1f}" '
+                             f'font-size="9" font-weight="500" fill="{ohlc_color}" '
+                             f'font-family="\'Inter\', sans-serif">{_fmt_price(val)}</text>')
+                _ox += 44
+            lines.append('</g>')
+
             # ── Render each candle: wick → body → glow → highlight ──
             for i, c in enumerate(el.candles):
                 cid = f"cs-{uid}-{i}"
@@ -958,7 +1010,7 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                 body_h = max(c.body_y_bot - c.body_y_top, 1.0)
                 wick_h = max(c.wick_y_bot - c.wick_y_top, 0.5)
 
-                # 1. Wick — gradient rect from high to low
+                # 1. Wick
                 anim = ""
                 if animate:
                     anim = f' style="animation:fp-refFade 0.45s ease {delay + 0.12:.2f}s both"'
@@ -967,7 +1019,7 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                     f'width="{c.wick_width:.1f}" height="{wick_h:.1f}" '
                     f'fill="url(#{cid}-w)" rx="0.6"{anim}/>'
                 )
-                # 2. Body — gradient rect from body_y_top to body_y_bot
+                # 2. Body
                 anim = ""
                 if animate:
                     anim = f' style="animation:fp-refFade 0.55s ease {delay:.2f}s both"'
@@ -976,7 +1028,7 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                     f'width="{c.body_width:.1f}" height="{body_h:.1f}" '
                     f'fill="url(#{cid}-b)" rx="0.8"{anim}/>'
                 )
-                # 3. Glow — blurred body rect (ambient light effect)
+                # 3. Glow (clipped to body)
                 anim = ""
                 if animate:
                     anim = f' style="animation:fp-refFade 0.7s ease {delay + 0.35:.2f}s both"'
@@ -988,7 +1040,7 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                     f'filter="url(#cGlow-{uid})"{anim}/>'
                     f'</g>'
                 )
-                # 4. Highlight — thin bright strip at top of body
+                # 4. Highlight
                 hl_h = max(1.0, body_h * 0.08)
                 anim = ""
                 if animate:
@@ -998,6 +1050,99 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                     f'width="{c.body_width:.1f}" height="{hl_h:.1f}" '
                     f'fill="url(#{cid}-h)" rx="0.5"{anim}/>'
                 )
+
+            # ── X-axis separator (dotted line) ──
+            sep_y = pa.y + pa.h
+            anim_sep = ""
+            if animate:
+                anim_sep = f' style="animation:fp-refFade 0.5s ease 0.45s both"'
+            lines.append(f'<line x1="{pa.x:.1f}" y1="{sep_y:.1f}" '
+                         f'x2="{pa.x + pa.w:.1f}" y2="{sep_y:.1f}" '
+                         f'stroke="#2a2a2e" stroke-width="0.5"{anim_sep}/>')
+
+            # ── Left fade gradient ──
+            anim_fade = ""
+            if animate:
+                anim_fade = f' style="animation:fp-refFade 0.6s ease 1.0s both"'
+            lines.append(f'<rect x="{pa.x:.1f}" y="{pa.y:.1f}" width="18" '
+                         f'height="{pa.h:.1f}" fill="url(#cFadeL-{uid})" '
+                         f'pointer-events="none"{anim_fade}/>')
+
+            # ── Price badges on right y-axis (last candle open + close) ──
+            # Compute y positions for last candle's open and close
+            # Use the candle's body_y_top/bot which already map to pixel coords
+            close_y = lc.body_y_top if lc.close >= lc.open else lc.body_y_bot
+            open_y = lc.body_y_bot if lc.close >= lc.open else lc.body_y_top
+            # Nudge apart if too close
+            if abs(close_y - open_y) < 20:
+                mid_y = (close_y + open_y) / 2
+                close_y = mid_y - 10
+                open_y = mid_y + 10
+            badge_x = pa.x + pa.w + 4
+            badge_w = 56
+            anim_badge = ""
+            if animate:
+                anim_badge = f' style="animation:fp-refFade 0.5s ease 1.5s both"'
+            for b_price, b_y in [(lc.close, close_y), (lc.open, open_y)]:
+                lines.append(f'<g{anim_badge}>')
+                lines.append(f'<rect x="{badge_x:.1f}" y="{b_y - 10:.1f}" '
+                             f'width="{badge_w}" height="20" fill="{badge_color}" rx="2"/>')
+                lines.append(f'<text x="{badge_x + 4:.1f}" y="{b_y + 4:.1f}" '
+                             f'font-size="11" font-weight="400" fill="#fff" '
+                             f'font-family="\'Instrument Serif\', serif">'
+                             f'{_fmt_price(b_price)}</text>')
+                lines.append('</g>')
+                # Dashed price line extending from chart to badge
+                lines.append(f'<line x1="{pa.x:.1f}" y1="{b_y:.1f}" '
+                             f'x2="{badge_x:.1f}" y2="{b_y:.1f}" '
+                             f'stroke="{badge_color}" stroke-width="0.5" '
+                             f'stroke-dasharray="2 3" opacity="0.35"{anim_badge}/>')
+
+            # ── Bottom bar: timeframes (left) + calendar + divider + UTC clock (right) ──
+            bot_y = pa.y + pa.h + 24
+            anim_bot = ""
+            if animate:
+                anim_bot = f' style="animation:fp-refFade 0.5s ease 1.2s both"'
+            lines.append(f'<g{anim_bot}>')
+            # Timeframe buttons
+            tf_x = pa.x
+            for tf_label in el.timeframes:
+                is_active = tf_label == el.active_timeframe
+                tf_color = "#fff" if is_active else "#707073"
+                lines.append(f'<text x="{tf_x:.1f}" y="{bot_y:.1f}" '
+                             f'font-size="10" font-weight="500" fill="{tf_color}" '
+                             f'font-family="\'Inter\', sans-serif">{tf_label}</text>')
+                tf_x += len(tf_label) * 6.5 + 8
+            # Calendar icon (SVG inline)
+            cal_x = tf_x + 2
+            cal_y = bot_y - 10
+            lines.append(f'<g transform="translate({cal_x:.1f},{cal_y:.1f})" opacity="0.7">')
+            lines.append(f'<rect x="1" y="3" width="12" height="10" rx="1.5" '
+                         f'stroke="#707073" stroke-width="1.2" fill="none"/>')
+            lines.append(f'<line x1="4" y1="1" x2="4" y2="4.5" stroke="#707073" '
+                         f'stroke-width="1.2" stroke-linecap="round"/>')
+            lines.append(f'<line x1="10" y1="1" x2="10" y2="4.5" stroke="#707073" '
+                         f'stroke-width="1.2" stroke-linecap="round"/>')
+            lines.append(f'<line x1="1" y1="6.5" x2="13" y2="6.5" stroke="#707073" '
+                         f'stroke-width="1"/>')
+            lines.append('</g>')
+            # Divider line
+            div_x = cal_x + 18
+            lines.append(f'<line x1="{div_x:.1f}" y1="{bot_y - 9:.1f}" '
+                         f'x2="{div_x:.1f}" y2="{bot_y + 3:.1f}" '
+                         f'stroke="#3a3a3e" stroke-width="1"/>')
+            # UTC clock (right-aligned)
+            import datetime
+            _now = datetime.datetime.now(datetime.timezone.utc)
+            _off = datetime.datetime.now().astimezone().utcoffset()
+            _off_h = int(_off.total_seconds() // 3600) if _off else 0
+            _sign = "+" if _off_h >= 0 else "-"
+            utc_str = f"{_now.hour:02d}:{_now.minute:02d}:{_now.second:02d} (UTC{_sign}{abs(_off_h)})"
+            utc_x = pa.x + pa.w + badge_w
+            lines.append(f'<text x="{utc_x:.1f}" y="{bot_y:.1f}" text-anchor="end" '
+                         f'font-size="10" font-weight="500" fill="#707073" '
+                         f'font-family="\'Inter\', sans-serif">{utc_str}</text>')
+            lines.append('</g>')
 
         elif isinstance(el, PiePlotElement):
             pcx, pcy, pr = el.cx, el.cy, el.radius

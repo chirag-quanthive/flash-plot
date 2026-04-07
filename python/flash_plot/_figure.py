@@ -246,6 +246,10 @@ class CandlestickPlotElement:
     label: Optional[str] = None
     zorder: int = 0
     x_labels: List[str] = field(default_factory=list)
+    ticker: str = ""
+    interval: str = ""
+    timeframes: List[str] = field(default_factory=lambda: ["5y", "1y", "3m", "1m", "5d", "1d"])
+    active_timeframe: str = "1m"
 
 PlotElement = Union[
     LinePlotElement, AreaPlotElement, BarPlotElement, ScatterPlotElement,
@@ -478,8 +482,12 @@ class Axes:
         self._commands.append(_PieCmd(values=vals, labels=lbls, colors=colors, opts=kwargs))
         return self
 
-    def candlestick(self, opens, highs, lows, closes, x_labels=None, **kwargs) -> "Axes":
-        """candlestick(opens, highs, lows, closes, x_labels=None, bull_color=..., bear_color=...)"""
+    def candlestick(self, opens, highs, lows, closes, x_labels=None, ticker=None, interval=None, **kwargs) -> "Axes":
+        """candlestick(opens, highs, lows, closes, x_labels=None, ticker=..., interval=..., ...)"""
+        if ticker:
+            kwargs["ticker"] = ticker
+        if interval:
+            kwargs["interval"] = interval
         self._commands.append(_CandlestickCmd(
             opens=list(opens), highs=list(highs), lows=list(lows), closes=list(closes),
             x_labels=list(x_labels) if x_labels else [],
@@ -549,8 +557,12 @@ class Axes:
     def _render(self, bounds: Rect) -> SubplotScene:
         # Detect pie-only: use tighter padding (no axes needed)
         _is_pie_only = all(isinstance(c, _PieCmd) for c in self._commands) and len(self._commands) > 0
+        _is_candlestick = any(isinstance(c, _CandlestickCmd) for c in self._commands)
         if _is_pie_only:
             pa = compute_layout(bounds.w, bounds.h, padding=Padding(top=4, right=4, bottom=8, left=8), inset=8)
+        elif _is_candlestick:
+            # Right y-axis panel (72px) + bottom bar (timeframes + UTC clock, 36px)
+            pa = compute_layout(bounds.w, bounds.h, padding=Padding(top=4, right=72, bottom=48, left=10), inset=8)
         else:
             pa = compute_layout(bounds.w, bounds.h)  # plot area relative to (0,0)
 
@@ -1013,6 +1025,10 @@ class Axes:
                     candles=candles, bull_color=bull_color, bear_color=bear_color,
                     wick_color=wick_color, x_labels=x_labels_list,
                     label=cmd.opts.get("label"), zorder=cmd.opts.get("zorder", z),
+                    ticker=cmd.opts.get("ticker", ""),
+                    interval=cmd.opts.get("interval", ""),
+                    timeframes=cmd.opts.get("timeframes", ["5y", "1y", "3m", "1m", "5d", "1d"]),
+                    active_timeframe=cmd.opts.get("active_timeframe", "1m"),
                 )
                 elements.append(el)
 
