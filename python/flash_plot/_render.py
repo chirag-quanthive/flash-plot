@@ -939,6 +939,15 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                     lines.append('  <stop offset="0%" stop-color="#FFF4B8"/>')
                     lines.append('  <stop offset="100%" stop-color="#FFF4B8" stop-opacity="0"/>')
                     lines.append('</linearGradient>')
+            # Clip paths to contain glow within body bounds
+            for i, c in enumerate(el.candles):
+                cid = f"cs-{uid}-{i}"
+                _bx = c.center_x - c.body_width / 2
+                _bh = max(c.body_y_bot - c.body_y_top, 1.0)
+                lines.append(f'<clipPath id="{cid}-clip">')
+                lines.append(f'  <rect x="{_bx:.1f}" y="{c.body_y_top:.1f}" '
+                             f'width="{c.body_width:.1f}" height="{_bh:.1f}" rx="0.8"/>')
+                lines.append('</clipPath>')
             lines.append('</defs>')
 
             # ── Render each candle: wick → body → glow → highlight ──
@@ -972,10 +981,12 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                 if animate:
                     anim = f' style="animation:fp-refFade 0.7s ease {delay + 0.35:.2f}s both"'
                 lines.append(
-                    f'<rect x="{bx - 1:.1f}" y="{c.body_y_top - 1:.1f}" '
-                    f'width="{c.body_width + 2:.1f}" height="{body_h + 2:.1f}" '
+                    f'<g clip-path="url(#{cid}-clip)">'
+                    f'<rect x="{bx - 2:.1f}" y="{c.body_y_top - 2:.1f}" '
+                    f'width="{c.body_width + 4:.1f}" height="{body_h + 4:.1f}" '
                     f'fill="url(#{cid}-b)" rx="1" opacity="0.25" '
                     f'filter="url(#cGlow-{uid})"{anim}/>'
+                    f'</g>'
                 )
                 # 4. Highlight — thin bright strip at top of body
                 hl_h = max(1.0, body_h * 0.08)
