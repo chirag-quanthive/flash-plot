@@ -1103,7 +1103,7 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                              f'stroke-dasharray="2 3" opacity="0.35"{anim_badge}/>')
 
             # ── Bottom bar: timeframes (left) + calendar + divider + UTC clock (right) ──
-            bot_y = pa.y + pa.h + 38
+            bot_y = pa.y + pa.h + 48
             anim_bot = ""
             if animate:
                 anim_bot = f' style="animation:fp-refFade 0.5s ease 1.2s both"'

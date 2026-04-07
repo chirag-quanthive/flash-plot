@@ -561,8 +561,8 @@ class Axes:
         if _is_pie_only:
             pa = compute_layout(bounds.w, bounds.h, padding=Padding(top=4, right=4, bottom=8, left=8), inset=8)
         elif _is_candlestick:
-            # Right y-axis panel (72px) + x-labels (22px) + gap (8px) + bottom bar (24px)
-            pa = compute_layout(bounds.w, bounds.h, padding=Padding(top=4, right=72, bottom=62, left=10), inset=8)
+            # Right y-axis panel (72px) + x-labels (18px) + gap (18px) + bottom bar (24px)
+            pa = compute_layout(bounds.w, bounds.h, padding=Padding(top=4, right=72, bottom=72, left=10), inset=8)
         else:
             pa = compute_layout(bounds.w, bounds.h)  # plot area relative to (0,0)
 
