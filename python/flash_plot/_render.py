@@ -569,7 +569,7 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
             anim_style = f'--fp-base:{ts.color};animation:{fade},{shimmer};'
         if is_candlestick:
             # Candlestick: 9px Inter, #707073, positioned below separator
-            lines.append(f'<text class="fp-ax" x="{t.position:.1f}" y="{pa.y + pa.h + 15:.1f}" text-anchor="middle" '
+            lines.append(f'<text class="fp-ax" x="{t.position:.1f}" y="{pa.y + pa.h + 18:.1f}" text-anchor="middle" '
                          f'font-size="9" font-weight="500" '
                          f'font-family="\'Inter\', sans-serif" '
                          f'fill="#707073" style="{anim_style}">{_esc(t.label)}</text>')
@@ -981,22 +981,26 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                 lines.append('</clipPath>')
             lines.append('</defs>')
 
-            # ── OHLC pill (top-left, below title/subtitle) ──
-            ohlc_y = pa.y - 6
+            # ── OHLC pill (below subtitle, above chart area) ──
+            # Position: subtitle_bottom + 6px gap
+            _sub_bottom = 14 + (sp.title_style.font_size + 4 if sp.title else 0) + \
+                          (sp.subtitle_style.font_size if sp.subtitle else 0)
+            ohlc_pill_y = _sub_bottom + 6  # top of pill rect
+            ohlc_text_y = ohlc_pill_y + 13  # text baseline inside pill
             ohlc_x = pa.x
             anim_ohlc = ""
             if animate:
                 anim_ohlc = f' style="animation:fp-refFade 0.5s ease 0.3s both"'
             lines.append(f'<g{anim_ohlc}>')
-            lines.append(f'<rect x="{ohlc_x:.1f}" y="{ohlc_y - 14:.1f}" width="220" height="18" '
+            lines.append(f'<rect x="{ohlc_x:.1f}" y="{ohlc_pill_y:.1f}" width="220" height="18" '
                          f'rx="3" fill="#242424"/>')
             _ox = ohlc_x + 8
             for lbl_char, val in [("O", lc.open), ("H", lc.high), ("L", lc.low), ("C", lc.close)]:
-                lines.append(f'<text x="{_ox:.1f}" y="{ohlc_y - 2:.1f}" '
+                lines.append(f'<text x="{_ox:.1f}" y="{ohlc_text_y:.1f}" '
                              f'font-size="9" font-weight="500" fill="#fff" '
                              f'font-family="\'Inter\', sans-serif">{lbl_char}</text>')
                 _ox += 10
-                lines.append(f'<text x="{_ox:.1f}" y="{ohlc_y - 2:.1f}" '
+                lines.append(f'<text x="{_ox:.1f}" y="{ohlc_text_y:.1f}" '
                              f'font-size="9" font-weight="500" fill="{ohlc_color}" '
                              f'font-family="\'Inter\', sans-serif">{_fmt_price(val)}</text>')
                 _ox += 44
@@ -1099,7 +1103,7 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                              f'stroke-dasharray="2 3" opacity="0.35"{anim_badge}/>')
 
             # ── Bottom bar: timeframes (left) + calendar + divider + UTC clock (right) ──
-            bot_y = pa.y + pa.h + 24
+            bot_y = pa.y + pa.h + 38
             anim_bot = ""
             if animate:
                 anim_bot = f' style="animation:fp-refFade 0.5s ease 1.2s both"'
