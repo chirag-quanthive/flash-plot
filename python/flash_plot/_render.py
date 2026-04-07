@@ -896,24 +896,96 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                          f'{_esc(json.dumps(surf_data, separators=(",",":")))}</desc>')
 
         elif isinstance(el, CandlestickPlotElement):
+            # ── Gradient defs for each candle (Figma frame 332:34) ──
+            lines.append('<defs>')
+            lines.append(f'<filter id="cGlow-{uid}" x="-30%" y="-30%" width="160%" height="160%">')
+            lines.append('  <feGaussianBlur in="SourceGraphic" stdDeviation="1.5"/>')
+            lines.append('</filter>')
             for i, c in enumerate(el.candles):
+                cid = f"cs-{uid}-{i}"
+                if c.is_bull:
+                    # Bull wick gradient
+                    lines.append(f'<linearGradient id="{cid}-w" x1="0" y1="0" x2="0" y2="1">')
+                    lines.append('  <stop offset="0%" stop-color="#ADE2B4"/>')
+                    lines.append('  <stop offset="19%" stop-color="#A5D5A1"/>')
+                    lines.append('  <stop offset="60%" stop-color="#88CB86"/>')
+                    lines.append('  <stop offset="100%" stop-color="#A0B7AF"/>')
+                    lines.append('</linearGradient>')
+                    # Bull body gradient
+                    lines.append(f'<linearGradient id="{cid}-b" x1="0" y1="0" x2="0" y2="1">')
+                    lines.append('  <stop offset="0%" stop-color="#8CE97E"/>')
+                    lines.append('  <stop offset="100%" stop-color="#317430"/>')
+                    lines.append('</linearGradient>')
+                    # Bull highlight gradient
+                    lines.append(f'<linearGradient id="{cid}-h" x1="0" y1="0" x2="0" y2="1">')
+                    lines.append('  <stop offset="0%" stop-color="#B9F7B6"/>')
+                    lines.append('  <stop offset="100%" stop-color="#B9F7B6" stop-opacity="0"/>')
+                    lines.append('</linearGradient>')
+                else:
+                    # Bear wick gradient
+                    lines.append(f'<linearGradient id="{cid}-w" x1="0" y1="0" x2="0" y2="1">')
+                    lines.append('  <stop offset="0%" stop-color="#D24445"/>')
+                    lines.append('  <stop offset="36%" stop-color="#FFDCA3"/>')
+                    lines.append('  <stop offset="77%" stop-color="#D96058"/>')
+                    lines.append('  <stop offset="100%" stop-color="#E57B77"/>')
+                    lines.append('</linearGradient>')
+                    # Bear body gradient
+                    lines.append(f'<linearGradient id="{cid}-b" x1="0" y1="0" x2="0" y2="1">')
+                    lines.append('  <stop offset="0%" stop-color="#f1946b" stop-opacity="0.9"/>')
+                    lines.append('  <stop offset="100%" stop-color="#FF4948"/>')
+                    lines.append('</linearGradient>')
+                    # Bear highlight gradient
+                    lines.append(f'<linearGradient id="{cid}-h" x1="0" y1="0" x2="0" y2="1">')
+                    lines.append('  <stop offset="0%" stop-color="#FFF4B8"/>')
+                    lines.append('  <stop offset="100%" stop-color="#FFF4B8" stop-opacity="0"/>')
+                    lines.append('</linearGradient>')
+            lines.append('</defs>')
+
+            # ── Render each candle: wick → body → glow → highlight ──
+            for i, c in enumerate(el.candles):
+                cid = f"cs-{uid}-{i}"
                 delay = T_DATA + i * 0.04
-                anim_style = ""
-                if animate:
-                    anim_style = f' style="animation:fp-refFade 0.4s ease {delay:.2f}s both"'
-                color = el.bull_color if c.is_bull else el.bear_color
-                # Wick — thin vertical line from high to low
-                wx = c.center_x
-                lines.append(
-                    f'<line x1="{wx:.1f}" y1="{c.wick_y_top:.1f}" x2="{wx:.1f}" y2="{c.wick_y_bot:.1f}" '
-                    f'stroke="{el.wick_color}" stroke-width="{c.wick_width:.1f}"{anim_style}/>'
-                )
-                # Body — colored rect from body_y_top to body_y_bot
                 bx = c.center_x - c.body_width / 2
                 body_h = max(c.body_y_bot - c.body_y_top, 1.0)
+                wick_h = max(c.wick_y_bot - c.wick_y_top, 0.5)
+
+                # 1. Wick — gradient rect from high to low
+                anim = ""
+                if animate:
+                    anim = f' style="animation:fp-refFade 0.45s ease {delay + 0.12:.2f}s both"'
                 lines.append(
-                    f'<rect x="{bx:.1f}" y="{c.body_y_top:.1f}" width="{c.body_width:.1f}" height="{body_h:.1f}" '
-                    f'rx="1" fill="{color}"{anim_style}/>'
+                    f'<rect x="{c.center_x - c.wick_width / 2:.1f}" y="{c.wick_y_top:.1f}" '
+                    f'width="{c.wick_width:.1f}" height="{wick_h:.1f}" '
+                    f'fill="url(#{cid}-w)" rx="0.6"{anim}/>'
+                )
+                # 2. Body — gradient rect from body_y_top to body_y_bot
+                anim = ""
+                if animate:
+                    anim = f' style="animation:fp-refFade 0.55s ease {delay:.2f}s both"'
+                lines.append(
+                    f'<rect x="{bx:.1f}" y="{c.body_y_top:.1f}" '
+                    f'width="{c.body_width:.1f}" height="{body_h:.1f}" '
+                    f'fill="url(#{cid}-b)" rx="0.8"{anim}/>'
+                )
+                # 3. Glow — blurred body rect (ambient light effect)
+                anim = ""
+                if animate:
+                    anim = f' style="animation:fp-refFade 0.7s ease {delay + 0.35:.2f}s both"'
+                lines.append(
+                    f'<rect x="{bx - 1:.1f}" y="{c.body_y_top - 1:.1f}" '
+                    f'width="{c.body_width + 2:.1f}" height="{body_h + 2:.1f}" '
+                    f'fill="url(#{cid}-b)" rx="1" opacity="0.25" '
+                    f'filter="url(#cGlow-{uid})"{anim}/>'
+                )
+                # 4. Highlight — thin bright strip at top of body
+                hl_h = max(1.0, body_h * 0.08)
+                anim = ""
+                if animate:
+                    anim = f' style="animation:fp-refFade 0.8s ease {delay + 0.4:.2f}s both"'
+                lines.append(
+                    f'<rect x="{bx:.1f}" y="{c.body_y_top:.1f}" '
+                    f'width="{c.body_width:.1f}" height="{hl_h:.1f}" '
+                    f'fill="url(#{cid}-h)" rx="0.5"{anim}/>'
                 )
 
         elif isinstance(el, PiePlotElement):
