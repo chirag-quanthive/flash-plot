@@ -250,6 +250,7 @@ class CandlestickPlotElement:
     interval: str = ""
     timeframes: List[str] = field(default_factory=lambda: ["5y", "1y", "3m", "1m", "5d", "1d"])
     active_timeframe: str = "1m"
+    inner_width: float = 0  # >0 when candle area overflows viewport (scrollable)
 
 PlotElement = Union[
     LinePlotElement, AreaPlotElement, BarPlotElement, ScatterPlotElement,
@@ -737,7 +738,16 @@ class Axes:
         x_axis = AxisScene(True, self._xlabel, x_tick_marks, tick_style, self._xscale, x_lo, x_hi, x_range)
         y_axis = AxisScene(True, self._ylabel, y_tick_marks, tick_style, self._yscale, y_lo, y_hi, y_range)
 
-        # Grid
+        # Grid — extend width for scrollable candlestick charts
+        _grid_right = pa.x + pa.w
+        if _is_candlestick:
+            _cs_cmd = next((c for c in self._commands if isinstance(c, _CandlestickCmd)), None)
+            if _cs_cmd:
+                _cs_n = len(_cs_cmd.opens)
+                _cs_gw = max(pa.w / _cs_n, 32) if _cs_n > 0 else pa.w
+                _cs_inner = _cs_gw * _cs_n
+                if _cs_inner > pa.w:
+                    _grid_right = pa.x + _cs_inner
         grid_visible = self._grid_opts.get("visible", True)
         grid_axis = self._grid_opts.get("axis", "y")
         grid_lines: List[GridLine] = []
@@ -746,7 +756,7 @@ class Axes:
             gw = self._grid_opts.get("linewidth", self._theme.grid_width)
             if grid_axis in ("y", "both"):
                 for t in y_tick_marks:
-                    grid_lines.append(GridLine(pa.x, t.position, pa.x + pa.w, t.position, gc, gw))
+                    grid_lines.append(GridLine(pa.x, t.position, _grid_right, t.position, gc, gw))
             if grid_axis in ("x", "both"):
                 for t in x_tick_marks:
                     grid_lines.append(GridLine(t.position, pa.y, t.position, pa.y + pa.h, gc, gw))
@@ -994,7 +1004,12 @@ class Axes:
                 n = len(cmd.opens)
                 if n == 0:
                     continue
-                gw = pa.w / n
+                # Fixed minimum spacing per candle (matches TSX BASE_SPACING=42)
+                MIN_CANDLE_SPACING = 32
+                natural_gw = pa.w / n
+                gw = max(natural_gw, MIN_CANDLE_SPACING)
+                inner_candle_w = gw * n  # total width needed for all candles
+                overflow = inner_candle_w > pa.w
                 body_w = max(gw * 0.55, 3.0)
                 wick_w = max(gw * 0.08, 1.0)
                 bull_color = cmd.opts.get("bull_color", "#4ECDC4")
@@ -1029,6 +1044,7 @@ class Axes:
                     interval=cmd.opts.get("interval", ""),
                     timeframes=cmd.opts.get("timeframes", ["5y", "1y", "3m", "1m", "5d", "1d"]),
                     active_timeframe=cmd.opts.get("active_timeframe", "1m"),
+                    inner_width=inner_candle_w if overflow else 0,
                 )
                 elements.append(el)
 

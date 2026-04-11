@@ -412,6 +412,13 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
     is_pie_only = all(isinstance(el, PiePlotElement) for el in sp.elements) and len(sp.elements) > 0
     # Check if subplot is a candlestick chart (override fonts)
     is_candlestick = any(isinstance(el, CandlestickPlotElement) for el in sp.elements)
+    # Effective right edge for candlestick (wider when scrollable)
+    _cs_eff_right = pa.x + pa.w
+    if is_candlestick:
+        for _el in sp.elements:
+            if isinstance(_el, CandlestickPlotElement) and _el.inner_width > 0:
+                _cs_eff_right = pa.x + _el.inner_width
+                break
 
     # Add extra height for legend below x-axis (pie charts use side legend, no extra height)
     if is_pie_only or not (sp.legend and sp.legend.entries):
@@ -437,12 +444,31 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
         svg_h = _pie_bottom + 8 if _pie_bottom > 0 else pa.y + pa.h + 6
     else:
         svg_h = h + legend_extra_h
-    lines.append(f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w:.1f} {svg_h:.1f}" '
-                 f'class="fp-dark" '
-                 f'style="width:100%;height:auto;display:block;font-family:\'Inter\',sans-serif;">')
+
+    # Detect scrollable candlestick: widen SVG if inner_width > plot area
+    _cs_inner = 0
+    for el in sp.elements:
+        if isinstance(el, CandlestickPlotElement) and el.inner_width > 0:
+            _cs_inner = el.inner_width
+    if _cs_inner > 0:
+        # Expand SVG width to fit all candles; right chrome stays at right edge
+        _extra_w = _cs_inner - pa.w
+        svg_w = w + _extra_w
+    else:
+        svg_w = w
+
+    if _cs_inner > 0:
+        # Scrollable: fixed pixel width so it overflows the container
+        lines.append(f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {svg_w:.1f} {svg_h:.1f}" '
+                     f'class="fp-dark fp-candle-scroll-svg" '
+                     f'style="width:{svg_w:.0f}px;height:auto;display:block;font-family:\'Inter\',sans-serif;">')
+    else:
+        lines.append(f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {svg_w:.1f} {svg_h:.1f}" '
+                     f'class="fp-dark" '
+                     f'style="width:100%;height:auto;display:block;font-family:\'Inter\',sans-serif;">')
 
     # Background rect (themed)
-    lines.append(f'<rect class="fp-bg" width="{w:.1f}" height="{svg_h:.1f}" fill="{theme.background}" rx="4"/>')
+    lines.append(f'<rect class="fp-bg" width="{svg_w:.1f}" height="{svg_h:.1f}" fill="{theme.background}" rx="4"/>')
 
     # Inline styles placeholder — will be finalized after collecting bar tip CSS rules
     style_insert_idx = len(lines)
@@ -545,7 +571,7 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
             anim_style = f'--fp-base:{ts.color};animation:{fade},{shimmer};'
         if is_candlestick:
             # Candlestick: right-aligned y-axis, Instrument Serif, white, 12px
-            y_lbl_x = pa.x + pa.w + 8
+            y_lbl_x = _cs_eff_right + 8
             lines.append(f'<text class="fp-ax" x="{y_lbl_x:.1f}" y="{t.position + 4:.1f}" text-anchor="start" '
                          f'font-size="12" font-weight="400" '
                          f'font-family="\'Instrument Serif\', serif" '
@@ -1058,13 +1084,16 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                     f'fill="url(#{cid}-h)" rx="0.5"{anim}/>'
                 )
 
+            # Effective right edge (wider when scrollable)
+            _eff_right = pa.x + (el.inner_width if el.inner_width > 0 else pa.w)
+
             # ── X-axis separator (dotted line) ──
             sep_y = pa.y + pa.h
             anim_sep = ""
             if animate:
                 anim_sep = f' style="animation:fp-refFade 0.5s ease 0.45s both"'
             lines.append(f'<line x1="{pa.x:.1f}" y1="{sep_y:.1f}" '
-                         f'x2="{pa.x + pa.w:.1f}" y2="{sep_y:.1f}" '
+                         f'x2="{_eff_right:.1f}" y2="{sep_y:.1f}" '
                          f'stroke="#2a2a2e" stroke-width="0.5"{anim_sep}/>')
 
             # ── Left fade gradient ──
@@ -1076,16 +1105,13 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
                          f'pointer-events="none"{anim_fade}/>')
 
             # ── Price badges on right y-axis (last candle open + close) ──
-            # Compute y positions for last candle's open and close
-            # Use the candle's body_y_top/bot which already map to pixel coords
             close_y = lc.body_y_top if lc.close >= lc.open else lc.body_y_bot
             open_y = lc.body_y_bot if lc.close >= lc.open else lc.body_y_top
-            # Nudge apart if too close
             if abs(close_y - open_y) < 20:
                 mid_y = (close_y + open_y) / 2
                 close_y = mid_y - 10
                 open_y = mid_y + 10
-            badge_x = pa.x + pa.w + 4
+            badge_x = _eff_right + 4
             badge_w = 56
             anim_badge = ""
             if animate:
@@ -1145,7 +1171,7 @@ def _render_subplot(sp: SubplotScene, animate: bool, uid: str, hover: bool = Tru
             _off_h = int(_off.total_seconds() // 3600) if _off else 0
             _sign = "+" if _off_h >= 0 else "-"
             utc_str = f"{_now.hour:02d}:{_now.minute:02d}:{_now.second:02d} (UTC{_sign}{abs(_off_h)})"
-            utc_x = pa.x + pa.w + badge_w
+            utc_x = _eff_right + badge_w
             lines.append(f'<text x="{utc_x:.1f}" y="{bot_y:.1f}" text-anchor="end" '
                          f'font-size="10" font-weight="500" fill="#707073" '
                          f'font-family="\'Inter\', sans-serif">{utc_str}</text>')
@@ -1859,8 +1885,39 @@ def render_html(scene: Scene, animate: bool = True, hover: bool = True) -> str:
         isinstance(el, SurfacePlotElement)
         for sp in scene.subplots for el in sp.elements
     )
+    # Check if any subplot has a scrollable candlestick
+    _scroll_cs = any(
+        isinstance(el, CandlestickPlotElement) and el.inner_width > 0
+        for sp in scene.subplots for el in sp.elements
+    )
     surface_script = f"\n<script>{_SURFACE_JS}</script>" if has_surface else ""
-    return f"""<div style="background:{theme.background};padding:16px;border-radius:8px;max-width:660px;">
+
+    if _scroll_cs:
+        # Scrollable candlestick: wrap SVG in a horizontally scrollable container
+        # with hidden scrollbar, smooth scrolling, and auto-scroll to right end
+        _uid = f"fpsc{id(scene) % 100000}"
+        return f"""<div style="background:{theme.background};padding:16px;border-radius:8px;max-width:660px;position:relative;">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Instrument+Serif&display=swap');
+{_CSS_ANIMATIONS}
+.fp-scroll-wrap::-webkit-scrollbar{{display:none}}
+.fp-scroll-wrap{{-ms-overflow-style:none;scrollbar-width:none;scroll-behavior:smooth}}
+</style>
+<div id="{_uid}" class="fp-scroll-wrap" style="overflow-x:auto;overflow-y:hidden;">
+{svg}
+</div>
+</div>
+<script>
+(function(){{var el=document.getElementById('{_uid}');if(el){{el.scrollLeft=el.scrollWidth;}}
+var start=null,from=0,to=el?el.scrollWidth:0;
+function ease(t){{return t<.5?2*t*t:(4-2*t)*t-1}}
+function anim(ts){{if(!start){{start=ts;from=0;}}var p=Math.min((ts-start)/800,1);
+el.scrollLeft=from+(to-from)*ease(p);if(p<1)requestAnimationFrame(anim);}}
+if(el)requestAnimationFrame(anim);
+}})();
+</script>{surface_script}"""
+    else:
+        return f"""<div style="background:{theme.background};padding:16px;border-radius:8px;max-width:660px;">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Instrument+Serif&display=swap');
 {_CSS_ANIMATIONS}
